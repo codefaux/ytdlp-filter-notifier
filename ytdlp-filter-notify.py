@@ -426,6 +426,14 @@ if __name__ == "__main__":
     data_dir = args.data_dir
     ensure_dir(data_dir)
     config_file = os.path.join(data_dir, "config.json")
+
+    if not os.path.exists(config_file):
+        second_dir = os.path.join(data_dir, 'data')
+        second_file = os.path.join(second_dir, "config.json")
+        if os.path.exists(second_file):
+            data_dir = second_dir
+            config_file = second_file
+
     channels_file = os.path.join(data_dir, "channels.json")
     cache_file = os.path.join(data_dir, "seen_videos.json")
 
