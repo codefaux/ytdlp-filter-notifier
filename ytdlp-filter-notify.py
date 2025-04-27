@@ -132,27 +132,27 @@ def explain_skip_reason(info, criteria):
 
     includes = criteria.get('title_include', [])
     if includes and not any(word.lower() in title for word in includes):
-        return f"Title missing required keywords: {includes}"
+        return f"Title missing: {includes}"
 
     excludes = criteria.get('title_exclude', [])
     if any(word.lower() in title for word in excludes):
-        return f"Title contains excluded keywords: {excludes}"
+        return f"Title excluded: {excludes}"
 
     desc_includes = criteria.get('description_include', [])
     if desc_includes and not any(word.lower() in description for word in desc_includes):
-        return f"Description missing required keywords: {desc_includes}"
+        return f"Description missing: {desc_includes}"
 
     desc_excludes = criteria.get('description_exclude', [])
     if any(word.lower() in description for word in desc_excludes):
-        return f"Description contains excluded keywords: {desc_excludes}"
+        return f"Description excluded: {desc_excludes}"
 
     min_length = criteria.get('min_length_seconds', 0)
     if min_length and duration < min_length:
-        return f"Duration too short ({duration}s < {min_length}s)"
+        return f"Too short ({duration}s)"
 
     max_length = criteria.get('max_length_seconds', 0)
     if max_length and duration > max_length:
-        return f"Duration too long ({duration}s > {max_length}s)"
+        return f"Too long ({duration}s)"
 
     return "Matched"
 
