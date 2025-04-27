@@ -97,6 +97,10 @@ def matches_filters(info, criteria):
     if desc_includes and not any(word.lower() in description for word in desc_includes):
         return False
 
+    desc_excludes = criteria.get('description_exclude', [])
+    if any(word.lower() in description for word in desc_excludes):
+        return False
+
     min_length = criteria.get('min_length_seconds', 0)
     if min_length and duration < min_length:
         return False
@@ -138,6 +142,10 @@ def explain_skip_reason(info, criteria):
     if desc_includes and not any(word.lower() in description for word in desc_includes):
         return f"Description missing required keywords: {desc_includes}"
 
+    desc_excludes = criteria.get('description_exclude', [])
+    if any(word.lower() in description for word in desc_excludes):
+        return f"Description contains excluded keywords: {desc_excludes}"
+
     min_length = criteria.get('min_length_seconds', 0)
     if min_length and duration < min_length:
         return f"Duration too short ({duration}s < {min_length}s)"
@@ -164,6 +172,10 @@ def interactive_add_channel(channels_file):
         if input("Filter by description includes? (y/n): ").strip().lower() == 'y':
             desc_includes = input("Enter description keywords (comma separated): ").strip()
             criteria['description_include'] = [word.strip() for word in desc_includes.split(",")] if desc_includes else []
+
+        if input("Filter by description excludes? (y/n): ").strip().lower() == 'y':
+            desc_excludes = input("Enter description exclude keywords (comma separated): ").strip()
+            criteria['description_exclude'] = [word.strip() for word in desc_excludes.split(",")] if desc_excludes else []
 
         if input("Set minimum length (seconds)? (y/n): ").strip().lower() == 'y':
             min_length = int(input("Enter minimum length in seconds: ").strip())
