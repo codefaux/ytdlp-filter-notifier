@@ -79,7 +79,7 @@ def get_latest_videos(channel_url, playlist_end=None):
         return [], None
     try:
         data = json.loads(result.stdout)
-        return data.get('entries', [])[::-1], data.get('channel')
+        return data.get('entries', [])[::-1], data.get('channel') or data.get('title') or data.get('uploader')
     except json.JSONDecodeError:
         print("\033[91mFailed to parse yt-dlp output.\033[0m")
         return [], None
@@ -401,9 +401,9 @@ def run_monitor(bot_token, chat_id, channels_file, cache_file, dry_run=False, su
                     print("\033[90mAlready notified for:\033[0m", video_id)
                 continue
             if matches_filters(video, criteria):
-                message = f"{cname} :: {video['title']}\n\nhttps://www.youtube.com/watch?v={video_id}"
-                send_telegram_message(bot_token, chat_id, message, dry_run=dry_run)
+                message = f"{cname} :: {video['title']}\n\n{video['url']}"
                 print("\033[92mNotified for:\033[0m", video['title'])
+                send_telegram_message(bot_token, chat_id, message, dry_run=dry_run)
                 channel_cache.add(video_id)
             else:
                 if not suppress_skip_msgs:
