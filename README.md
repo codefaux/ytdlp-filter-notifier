@@ -60,6 +60,8 @@ When you run in `add` mode (`python3 ytdlp-filter-notify.py add` or Docker equiv
 - Default data directory is `./` manually, `/data` in Docker
 - To reconfigure the Telegram bot, rerun with `config` mode
 - Use `--interval-hours` to repeat runs on a timer
+- Use `--suppress-skip-msgs` to hide messages about skipped or already-notified videos
+- Use `dry-run` mode to simulate notifications without sending
 
 ## License
 This project is licensed under the Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0).  
