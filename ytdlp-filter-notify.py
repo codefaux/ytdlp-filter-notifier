@@ -79,7 +79,7 @@ def get_latest_videos(channel_url, playlist_end=None):
         return [], None
     try:
         data = json.loads(result.stdout)
-        return data.get('entries', []), data.get('channel')
+        return data.get('entries', [])[::-1], data.get('channel')
     except json.JSONDecodeError:
         print("\033[91mFailed to parse yt-dlp output.\033[0m")
         return [], None
