@@ -179,35 +179,37 @@ def preview_recent_videos(url, criteria, playlist_end):
     return videos, cname
 
 def explain_skip_reason(info, criteria):
+    reasons = []
+
     title = info.get('title', '').lower()
     description = info.get('description', '').lower()
     duration = info.get('duration', 0)
 
     includes = criteria.get('title_include', [])
     if includes and not any(word.lower() in title for word in includes):
-        return f"Title missing: {includes}"
+        reasons.append(f"Title missing: {includes}")
 
     excludes = criteria.get('title_exclude', [])
     if any(word.lower() in title for word in excludes):
-        return f"Title excluded: {excludes}"
+        reasons.append(f"Title excluded: {excludes}")
 
     desc_includes = criteria.get('description_include', [])
     if desc_includes and not any(word.lower() in description for word in desc_includes):
-        return f"Description missing: {desc_includes}"
+        reasons.append(f"Description missing: {desc_includes}")
 
     desc_excludes = criteria.get('description_exclude', [])
     if any(word.lower() in description for word in desc_excludes):
-        return f"Description excluded: {desc_excludes}"
+        reasons.append(f"Description excluded: {desc_excludes}")
 
     min_length = criteria.get('min_length_seconds', 0)
     if min_length and duration < min_length:
-        return f"Too short ({duration}s)"
+        reasons.append(f"Too short ({duration}s)")
 
     max_length = criteria.get('max_length_seconds', 0)
     if max_length and duration > max_length:
-        return f"Too long ({duration}s)"
+        reasons.append(f"Too long ({duration}s)")
 
-    return "Matched"
+    return "\n".join(reasons) if reasons else "Matched"
 
 def interactive_add_channel(channels_file):
     url = input("Enter the channel URL: ").strip()
