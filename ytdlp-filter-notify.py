@@ -61,15 +61,19 @@ def load_cache(cache_file):
 def save_cache(cache_file, cache):
     save_json(cache_file, cache)
 
-def get_latest_videos(channel_url):
-    result = subprocess.run([
+def get_latest_videos(channel_url, playlist_end=None):
+    cmd = [
         "yt-dlp",
         "--flat-playlist",
         "--dump-single-json",
         "--no-warnings",
         "--no-check-certificate",
-        channel_url
-    ], capture_output=True, text=True)
+    ]
+    if playlist_end:
+        cmd.extend(["--playlist-end", str(playlist_end)])
+    cmd.append(channel_url)
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         print("\033[91myt-dlp error:\033[0m", result.stderr)
         return [], None
@@ -159,6 +163,12 @@ def explain_skip_reason(info, criteria):
 def interactive_add_channel(channels_file):
     url = input("Enter the channel URL: ").strip()
 
+    try:
+        playlist_end = int(input("How many videos to pull during scan (max)? (e.g., 25): ").strip())
+    except ValueError:
+        playlist_end = 25
+        print("Invalid input, defaulting to 25.")
+
     criteria = {}
     while True:
         if input("Filter by title includes? (y/n): ").strip().lower() == 'y':
@@ -186,12 +196,10 @@ def interactive_add_channel(channels_file):
             criteria['max_length_seconds'] = max_length
 
         print("\nFetching recent videos to preview matches...")
-        videos, cname = get_latest_videos(url)
+        videos, cname = get_latest_videos(url, playlist_end=playlist_end)
         if not videos:
             print("No videos found or error fetching.")
             return
-
-        videos = videos[:15]
 
         table = prettytable.PrettyTable()
         table.field_names = ["Title", "Duration", "Result"]
@@ -210,7 +218,7 @@ def interactive_add_channel(channels_file):
         confirm = input("Are you happy with these filters? (y to accept, n to edit again, q to cancel): ").strip().lower()
         if confirm == 'y':
             channels = load_channels(channels_file, skip_add=True)
-            channels.append({"url": url, "criteria": criteria})
+            channels.append({"url": url, "criteria": criteria, "playlist_end": playlist_end})
             save_channels(channels_file, channels)
             print("Channel added.")
             return
@@ -227,14 +235,15 @@ def run_monitor(bot_token, chat_id, channels_file, cache_file, dry_run=False, su
     for channel in channels:
         url = channel.get('url')
         criteria = channel.get('criteria', {})
+        playlist_end = channel.get('playlist_end', 25)
         if not url:
             continue
 
         print(f"\033[92mChecking channel:\033[0m {url}")
-        videos, cname = get_latest_videos(url)
+        videos, cname = get_latest_videos(url, playlist_end=playlist_end)
         channel_cache = set(seen_videos.get(url, []))
 
-        for video in videos[:5]:
+        for video in videos:
             video_id = video['id']
             if video_id in channel_cache:
                 if not suppress_skip_msgs:
