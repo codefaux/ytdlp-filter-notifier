@@ -6,7 +6,7 @@ ENV PYTHONUNBUFFERED=1
 RUN apt-get update && apt-get install -y curl ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Install Python packages
-RUN pip install yt-dlp requests
+RUN pip install yt-dlp requests prettytable
 
 # Set working directory
 WORKDIR /app
