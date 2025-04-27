@@ -156,6 +156,28 @@ def send_telegram_message(bot_token, chat_id, text, dry_run=False):
 
     time.sleep(5)
 
+def preview_recent_videos(url, criteria, playlist_end):
+    print("\nFetching recent videos to preview matches...")
+    videos, cname = get_latest_videos(url, playlist_end=playlist_end)
+    if not videos:
+        print("No videos found or error fetching.")
+        return None, None
+
+    table = prettytable.PrettyTable()
+    table.field_names = ["Title", "Duration", "Result"]
+    table.max_width["Title"] = 60
+    for video in videos:
+        reason = explain_skip_reason(video, criteria)
+        duration = video.get('duration')
+        duration = f"{duration}s" if duration else "N/A"
+        title = video.get('title', 'N/A')
+        title = "\n".join([title[i:i+60] for i in range(0, len(title), 60)])
+        table.add_row([title, duration, reason])
+
+    print("\nRecent videos analysis:")
+    print(table)
+    return videos, cname
+
 def explain_skip_reason(info, criteria):
     title = info.get('title', '').lower()
     description = info.get('description', '').lower()
@@ -222,25 +244,9 @@ def interactive_add_channel(channels_file):
             max_length = int(input("Enter maximum length in seconds: ").strip())
             criteria['max_length_seconds'] = max_length
 
-        print("\nFetching recent videos to preview matches...")
-        videos, cname = get_latest_videos(url, playlist_end=playlist_end)
-        if not videos:
-            print("No videos found or error fetching.")
+        videos, cname = preview_recent_videos(url, criteria, playlist_end)
+        if videos is None:
             return
-
-        table = prettytable.PrettyTable()
-        table.field_names = ["Title", "Duration", "Result"]
-        table.max_width["Title"] = 60
-        for video in videos:
-            reason = explain_skip_reason(video, criteria)
-            duration = video.get('duration')
-            duration = f"{duration}s" if duration else "N/A"
-            title = video.get('title', 'N/A')
-            title = "\n".join([title[i:i+60] for i in range(0, len(title), 60)])
-            table.add_row([title, duration, reason])
-
-        print("\nRecent videos analysis:")
-        print(table)
 
         confirm = input("Are you happy with these filters? (y to accept, n to edit again, q to cancel): ").strip().lower()
         if confirm == 'y':
@@ -277,31 +283,14 @@ def interactive_edit_channel(channels_file):
     playlist_end = channel.get('playlist_end', 25)
     print(f"\nEditing: {url}")
 
-    print("\nFetching recent videos to preview matches...")
-    videos, cname = get_latest_videos(url, playlist_end=playlist_end)
-    if not videos:
-        print("No videos found or error fetching.")
-        return
-
-    table = prettytable.PrettyTable()
-    table.field_names = ["Title", "Duration", "Result"]
-    table.max_width["Title"] = 60
-    for video in videos:
-        reason = explain_skip_reason(video, criteria)
-        duration = video.get('duration')
-        duration = f"{duration}s" if duration else "N/A"
-        title = video.get('title', 'N/A')
-        title = "\n".join([title[i:i+60] for i in range(0, len(title), 60)])
-        table.add_row([title, duration, reason])
-
-    print("\nRecent videos analysis:")
-    print(table)
+    preview_recent_videos(url, criteria, playlist_end)
 
     # Allow editing playlist_end
     try:
         new_end = input(f"Current playlist_end={playlist_end}. Enter new value or leave blank to keep: ").strip()
         if new_end:
             channel['playlist_end'] = int(new_end)
+            playlist_end = channel['playlist_end']
     except ValueError:
         print("Invalid number. Keeping old playlist_end.")
 
@@ -340,9 +329,19 @@ def interactive_edit_channel(channels_file):
             print("Unknown action, skipping.")
 
     channel['criteria'] = criteria
-    channels[selection] = channel
-    save_channels(channels_file, channels)
-    print("Channel updated.")
+
+    preview_recent_videos(url, criteria, playlist_end)
+
+    confirm = input("Are you happy with these updated filters? (y to accept, n to edit again, q to cancel): ").strip().lower()
+    if confirm == 'y':
+        channels[selection] = channel
+        save_channels(channels_file, channels)
+        print("Channel updated.")
+    elif confirm == 'q':
+        print("Canceled changes.")
+    else:
+        print("Let's edit again.\n")
+        interactive_edit_channel(channels_file)
 
 def run_monitor(bot_token, chat_id, channels_file, cache_file, dry_run=False, suppress_skip_msgs=False):
     channels = load_channels(channels_file)
