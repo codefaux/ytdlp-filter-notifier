@@ -255,6 +255,95 @@ def interactive_add_channel(channels_file):
         else:
             print("Let's edit the filters again.\n")
 
+def interactive_edit_channel(channels_file):
+    channels = load_channels(channels_file)
+    if not channels:
+        print("No channels to edit.")
+        return
+
+    print("\nCurrent Channels:")
+    for idx, chan in enumerate(channels):
+        print(f"[{idx}] {chan.get('url', 'UNKNOWN')}")
+
+    try:
+        selection = int(input("\nSelect channel to edit (by number): ").strip())
+        channel = channels[selection]
+    except (ValueError, IndexError):
+        print("Invalid selection.")
+        return
+
+    url = channel.get('url')
+    criteria = channel.get('criteria', {})
+    playlist_end = channel.get('playlist_end', 25)
+    print(f"\nEditing: {url}")
+
+    print("\nFetching recent videos to preview matches...")
+    videos, cname = get_latest_videos(url, playlist_end=playlist_end)
+    if not videos:
+        print("No videos found or error fetching.")
+        return
+
+    table = prettytable.PrettyTable()
+    table.field_names = ["Title", "Duration", "Result"]
+    table.max_width["Title"] = 60
+    for video in videos:
+        reason = explain_skip_reason(video, criteria)
+        duration = video.get('duration')
+        duration = f"{duration}s" if duration else "N/A"
+        title = video.get('title', 'N/A')
+        title = "\n".join([title[i:i+60] for i in range(0, len(title), 60)])
+        table.add_row([title, duration, reason])
+
+    print("\nRecent videos analysis:")
+    print(table)
+
+    # Allow editing playlist_end
+    try:
+        new_end = input(f"Current playlist_end={playlist_end}. Enter new value or leave blank to keep: ").strip()
+        if new_end:
+            channel['playlist_end'] = int(new_end)
+    except ValueError:
+        print("Invalid number. Keeping old playlist_end.")
+
+    # Editable fields
+    fields = [
+        ('title_include', list),
+        ('title_exclude', list),
+        ('description_include', list),
+        ('description_exclude', list),
+        ('min_length_seconds', int),
+        ('max_length_seconds', int),
+    ]
+
+    for field, ftype in fields:
+        current = criteria.get(field, [] if ftype is list else 0)
+        print(f"\nCurrent {field}: {current}")
+        action = input("Modify? (s=set, a=append, c=clear, n=none): ").strip().lower()
+
+        if action == 's':
+            if ftype is list:
+                entries = input("Enter comma-separated values: ").strip()
+                criteria[field] = [e.strip() for e in entries.split(",") if e.strip()]
+            else:
+                try:
+                    criteria[field] = int(input("Enter new value: ").strip())
+                except ValueError:
+                    print("Invalid input. Skipping.")
+        elif action == 'a' and ftype is list:
+            entries = input("Enter comma-separated values to append: ").strip()
+            criteria.setdefault(field, []).extend([e.strip() for e in entries.split(",") if e.strip()])
+        elif action == 'c':
+            criteria[field] = [] if ftype is list else 0
+        elif action == 'n':
+            pass
+        else:
+            print("Unknown action, skipping.")
+
+    channel['criteria'] = criteria
+    channels[selection] = channel
+    save_channels(channels_file, channels)
+    print("Channel updated.")
+
 def run_monitor(bot_token, chat_id, channels_file, cache_file, dry_run=False, suppress_skip_msgs=False):
     channels = load_channels(channels_file)
     seen_videos = load_cache(cache_file)
@@ -293,7 +382,7 @@ def run_monitor(bot_token, chat_id, channels_file, cache_file, dry_run=False, su
 # === MAIN ===
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="YouTube channel monitor and Telegram notifier.")
-    parser.add_argument("mode", nargs="?", choices=["run", "add", "dry-run", "config"], default="run", help="Operation mode.")
+    parser.add_argument("mode", nargs="?", choices=["run", "add", "edit", "dry-run", "config"], default="run", help="Operation mode.")
     parser.add_argument("--data-dir", type=str, default=".", help="Directory to store config, channels and cache files.")
     parser.add_argument("--interval-hours", type=float, default=0.0, help="Interval in hours to repeat run mode. Default off.")
     parser.add_argument("--suppress-skip-msgs", action="store_true", help="Suppress skipped/already-seen video messages.")
@@ -315,6 +404,10 @@ if __name__ == "__main__":
 
     if args.mode == "add":
         interactive_add_channel(channels_file)
+        sys.exit(0)
+
+    if args.mode == "edit":
+        interactive_edit_channel(channels_file)
         sys.exit(0)
 
     dry_run = args.mode == "dry-run"
