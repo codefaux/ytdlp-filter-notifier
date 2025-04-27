@@ -13,7 +13,7 @@ import prettytable
 import re
 
 # === CONFIGURATION ===
-HAMMER_DELAY_RANGE = (5, 8)  # Seconds between requests
+HAMMER_DELAY_RANGE = (2, 4)  # Seconds between requests
 
 # === FUNCTIONS ===
 def ensure_dir(directory):
@@ -142,7 +142,7 @@ def send_telegram_message(bot_token, chat_id, text, dry_run=False):
                     print("\033[91mRate limit encountered, but retry_after missing. Exiting.\033[0m")
                     sys.exit(1)
                 print(f"\033[93mRate limited by Telegram. Retrying after {retry_after} seconds...\033[0m")
-                time.sleep(retry_after + 5)
+                time.sleep(retry_after + 3)
                 retries += 1
             except (ValueError, KeyError, json.JSONDecodeError):
                 print("\033[91mRate limit encountered, but failed to parse retry_after. Exiting.\033[0m")
@@ -155,7 +155,7 @@ def send_telegram_message(bot_token, chat_id, text, dry_run=False):
         print("\033[91mExceeded maximum retries. Exiting.\033[0m")
         sys.exit(1)
 
-    time.sleep(5)
+    time.sleep(2)
 
 def preview_recent_videos(url, criteria, playlist_end):
     print("\nFetching recent videos to preview matches...")
