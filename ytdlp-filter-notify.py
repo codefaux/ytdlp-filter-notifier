@@ -10,6 +10,7 @@ import random
 import argparse
 from datetime import datetime
 import prettytable
+import re
 
 # === CONFIGURATION ===
 HAMMER_DELAY_RANGE = (5, 8)  # Seconds between requests
@@ -276,14 +277,38 @@ def interactive_add_channel(channels_file):
             max_length = int(input("Enter maximum length in seconds: ").strip())
             criteria['max_length_seconds'] = max_length
 
-        videos, cname = preview_recent_videos(url, criteria, playlist_end)
-        if videos is None:
-            return
+        videos, discarded = preview_recent_videos(url, criteria, playlist_end)
+
+        url_regex = None
+        if input("Do you want to set a URL regex replacement? (y/n): ").strip().lower() == 'y':
+            while True:
+                pattern = input("Enter regex pattern to match in URL: ").strip()
+                replacement = input("Enter replacement string: ").strip()
+                url_regex = [pattern, replacement]
+
+                # Sample video preview
+                if videos:
+                    print("\nSample URL previews with your regex:")
+                    for sample_video in videos:  # show up to 5
+                        original_url = sample_video.get('url', '')
+                        modified_url = original_url
+                        try:
+                            modified_url = re.sub(pattern, replacement, original_url)
+                        except Exception as e:
+                            print(f"\033[91mRegex error:\033[0m {e}")
+                        print(f"Original: {original_url}")
+                        print(f"Modified: {modified_url}\n")
+
+                confirm = input("Are you happy with this regex? (y to accept, n to re-enter): ").strip().lower()
+                if confirm == 'y':
+                    break
+                else:
+                    print("Let's re-enter the regex.\n")
 
         confirm = input("Are you happy with these filters? (y to accept, n to edit again, q to cancel): ").strip().lower()
         if confirm == 'y':
             channels = load_channels(channels_file, skip_add=True)
-            channels.append({"url": url, "criteria": criteria, "playlist_end": playlist_end})
+            channels.append({"url": url, "criteria": criteria, "playlist_end": playlist_end, "url_regex": url_regex})
             save_channels(channels_file, channels)
             print("Channel added.")
             return
@@ -315,7 +340,7 @@ def interactive_edit_channel(channels_file):
     playlist_end = channel.get('playlist_end', 25)
     print(f"\nEditing: {url}")
 
-    preview_recent_videos(url, criteria, playlist_end)
+    videos, discarded = preview_recent_videos(url, criteria, playlist_end)
 
     confirm = input("Do you wish to edit these filters? (y to accept, anything else to cancel): ").strip().lower()
     if confirm != 'y':
@@ -366,6 +391,38 @@ def interactive_edit_channel(channels_file):
 
     channel['criteria'] = criteria
 
+    current_regex = channel.get('url_regex')
+    print(f"\nCurrent URL regex: {current_regex}")
+    action = input("Modify URL regex? (s=set new, c=clear, n=none): ").strip().lower()
+
+    if action == 's':
+        while True:
+            pattern = input("Enter new regex pattern: ").strip()
+            replacement = input("Enter new replacement string: ").strip()
+            new_url_regex = [pattern, replacement]
+
+            # Sample video preview
+            if videos:
+                print("\nSample URL previews with your regex:")
+                for sample_video in videos:
+                    original_url = sample_video.get('url', '')
+                    modified_url = original_url
+                    try:
+                        modified_url = re.sub(pattern, replacement, original_url)
+                    except Exception as e:
+                        print(f"\033[91mRegex error:\033[0m {e}")
+                    print(f"Original: {original_url}")
+                    print(f"Modified: {modified_url}\n")
+
+            confirm = input("Are you happy with this regex? (y to accept, n to re-enter): ").strip().lower()
+            if confirm == 'y':
+                channel['url_regex'] = new_url_regex
+                break
+            else:
+                print("Let's re-enter the regex.\n")
+    elif action == 'c':
+        channel['url_regex'] = None
+
     preview_recent_videos(url, criteria, playlist_end)
 
     confirm = input("Are you happy with these updated filters? (y to accept, n to edit again, q to cancel): ").strip().lower()
@@ -387,6 +444,8 @@ def run_monitor(bot_token, chat_id, channels_file, cache_file, dry_run=False, su
         url = channel.get('url')
         criteria = channel.get('criteria', {})
         playlist_end = channel.get('playlist_end', 25)
+        url_regex = channel.get('url_regex')
+
         if not url:
             continue
 
@@ -401,7 +460,15 @@ def run_monitor(bot_token, chat_id, channels_file, cache_file, dry_run=False, su
                     print("\033[90mAlready notified for:\033[0m", video_id)
                 continue
             if matches_filters(video, criteria):
-                message = f"{cname} :: {video['title']}\n\n{video['url']}"
+                video_url = video['url']
+                if url_regex:
+                    try:
+                        pattern, repl = url_regex
+                        video_url = re.sub(pattern, repl, video_url)
+                    except Exception as e:
+                        print(f"\033[91mFailed applying URL regex:\033[0m {e}")
+
+                message = f"{cname} :: {video['title']}\n\n{video_url}"
                 print("\033[92mNotified for:\033[0m", video['title'])
                 send_telegram_message(bot_token, chat_id, message, dry_run=dry_run)
                 channel_cache.add(video_id)
