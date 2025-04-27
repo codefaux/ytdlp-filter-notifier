@@ -18,4 +18,4 @@ COPY . /app/
 VOLUME ["/data"]
 
 # Default command
-CMD ["python", "watch_channel.py", "run", "--data-dir", "/data"]
+CMD ["python", "ytdlp-filter-notify.py", "run", "--data-dir", "/data"]
