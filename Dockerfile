@@ -18,4 +18,4 @@ COPY . /app/
 VOLUME ["/data"]
 
 # Default command
-CMD ["python", "ytdlp-filter-notify.py", "run", "--data-dir", "/data"]
+CMD ["python", "ytdlp-filter-notify.py", "run", "--suppress-skip-msgs", "--data-dir", "/data", "--interval-hours", "1"]
