@@ -171,23 +171,38 @@ def preview_recent_videos(url, criteria, playlist_end):
     table = prettytable.PrettyTable()
     table.field_names = ["Title", "Duration", "Result"]
     table.max_width["Title"] = 70
+    table.hrules = prettytable.HRuleStyle.ALL
 
     for video in videos:
         reason = explain_skip_reason(video, criteria)
-        duration = video.get('duration')
-        duration = f"{duration}s" if duration else "N/A"
+        duration_val = video.get('duration')
         raw_title = video.get('title', 'N/A')
+
+        if duration_val:
+            duration_str = f"{duration_val}s"
+        else:
+            duration_str = "N/A"
 
         title_lines = [raw_title[i:i+60] for i in range(0, len(raw_title), 60)]
 
         if reason == "Matched":
-            colored_lines = [f"{GREEN}{line}{RESET}" for line in title_lines]
+            colored_title_lines = [f"{GREEN}{line}{RESET}" for line in title_lines]
+            colored_duration = f"{GREEN}{duration_str}{RESET}"
         else:
-            colored_lines = [f"{RED}{line}{RESET}" for line in title_lines]
 
-        color_title = "\n".join(colored_lines)
+            if "title" in reason.lower():
+                colored_title_lines = [f"{RED}{line}{RESET}" for line in title_lines]
+            else:
+                colored_title_lines = title_lines
 
-        table.add_row([color_title, duration, reason])
+            if "short" in reason.lower() or "long" in reason.lower():
+                colored_duration = f"{RED}{duration_str}{RESET}"
+            else:
+                colored_duration = duration_str
+
+        color_title = "\n".join(colored_title_lines)
+
+        table.add_row([color_title, colored_duration, reason])
 
     print("\nRecent videos analysis:")
     print(table)
