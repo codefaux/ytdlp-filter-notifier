@@ -119,15 +119,42 @@ def send_telegram_message(bot_token, chat_id, text, dry_run=False):
     if dry_run:
         print(f"\033[94m[Dry-Run]\033[0m {text}")
         return
+
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {
         "chat_id": chat_id,
         "text": text,
         "disable_web_page_preview": False
     }
-    response = requests.post(url, json=payload)
-    if response.status_code != 200:
-        print("\033[91mFailed to send Telegram message:\033[0m", response.text)
+
+    retries = 0
+    max_retries = 3
+
+    while retries <= max_retries:
+        response = requests.post(url, json=payload)
+        if response.status_code == 200:
+            break
+        elif response.status_code == 429:
+            try:
+                retry_after = response.json().get('parameters', {}).get('retry_after')
+                if retry_after is None:
+                    print("\033[91mRate limit encountered, but retry_after missing. Exiting.\033[0m")
+                    sys.exit(1)
+                print(f"\033[93mRate limited by Telegram. Retrying after {retry_after} seconds...\033[0m")
+                time.sleep(retry_after + 5)
+                retries += 1
+            except (ValueError, KeyError, json.JSONDecodeError):
+                print("\033[91mRate limit encountered, but failed to parse retry_after. Exiting.\033[0m")
+                sys.exit(1)
+        else:
+            print(f"\033[91mFailed to send Telegram message (HTTP {response.status_code}):\033[0m", response.text)
+            sys.exit(1)
+
+    if retries > max_retries:
+        print("\033[91mExceeded maximum retries. Exiting.\033[0m")
+        sys.exit(1)
+
+    time.sleep(5)
 
 def explain_skip_reason(info, criteria):
     title = info.get('title', '').lower()
