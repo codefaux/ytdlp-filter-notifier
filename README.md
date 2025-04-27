@@ -32,16 +32,16 @@ A lightweight YouTube watcher that monitors channels and sends Telegram messages
 ### Docker
 1. Pull the image:
    ```bash
-   docker pull ghcr.io/your-repo/ytdlp-telegram-filter-notify:latest
+   docker pull ghcr.io/codefaux/ytdlp-telegram-filter-notify:latest
    ```
 2. Create a persistent data directory and configure:
    ```bash
    mkdir data
-   docker run --rm -it -v "$PWD/data":/data ghcr.io/your-repo/ytdlp-telegram-filter-notify config
+   docker run --rm -it -v "$PWD/data":/data ghcr.io/codefaux/ytdlp-telegram-filter-notify config
    ```
 3. Add channels:
    ```bash
-   docker run --rm -it -v "$PWD/data":/data ghcr.io/your-repo/ytdlp-telegram-filter-notify add
+   docker run --rm -it -v "$PWD/data":/data ghcr.io/codefaux/ytdlp-telegram-filter-notify add
    ```
 4. Run continuously:
    ```bash
