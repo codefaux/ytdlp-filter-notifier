@@ -157,7 +157,7 @@ def send_telegram_message(bot_token, chat_id, text, dry_run=False):
 
     time.sleep(2)
 
-def preview_recent_videos(url, criteria, playlist_end):
+def preview_recent_videos(url, criteria, playlist_end, url_regex=None):
     print("\nFetching recent videos to preview matches...")
     videos, cname = get_latest_videos(url, playlist_end=playlist_end)
     if not videos:
@@ -170,7 +170,15 @@ def preview_recent_videos(url, criteria, playlist_end):
     RESET = '\033[0m'
 
     table = prettytable.PrettyTable()
-    table.field_names = ["Title", "Duration", "Result"]
+
+    if url_regex:
+        table.field_names = ["Title", "Duration", "Result", "URL"]
+        # table.field_names.append("URL")
+        table.max_width["URL"] =  60
+    else:
+        table.field_names = ["Title", "Duration", "Result"]
+
+
     table.max_width["Title"] = 70
     table.hrules = prettytable.HRuleStyle.ALL
 
@@ -178,6 +186,16 @@ def preview_recent_videos(url, criteria, playlist_end):
         reason = explain_skip_reason(video, criteria)
         duration_val = video.get('duration')
         raw_title = video.get('title', 'N/A')
+
+        video_url = video.get('url', '')
+        modified_url = video_url
+
+        if url_regex:
+            try:
+                pattern, repl = url_regex
+                modified_url = re.sub(pattern, repl, video_url)
+            except Exception as e:
+                modified_url = f"Regex error: {e}"
 
         if duration_val:
             duration_str = f"{duration_val}s"
@@ -190,7 +208,6 @@ def preview_recent_videos(url, criteria, playlist_end):
             colored_title_lines = [f"{GREEN}{line}{RESET}" for line in title_lines]
             colored_duration = f"{GREEN}{duration_str}{RESET}"
         else:
-
             if "title" in reason.lower():
                 colored_title_lines = [f"{RED}{line}{RESET}" for line in title_lines]
             else:
@@ -203,7 +220,11 @@ def preview_recent_videos(url, criteria, playlist_end):
 
         color_title = "\n".join(colored_title_lines)
 
-        table.add_row([color_title, colored_duration, reason])
+        if url_regex:
+            url_display = f"{RED}IN:{RESET}{video_url}\n{GREEN}OUT:{RESET}{modified_url}"
+            table.add_row([color_title, colored_duration, reason, url_display])
+        else:
+            table.add_row([color_title, colored_duration, reason])
 
     print("\nRecent videos analysis:")
     print(table)
@@ -277,8 +298,6 @@ def interactive_add_channel(channels_file):
             max_length = int(input("Enter maximum length in seconds: ").strip())
             criteria['max_length_seconds'] = max_length
 
-        videos, discarded = preview_recent_videos(url, criteria, playlist_end)
-
         url_regex = None
         if input("Do you want to set a URL regex replacement? (y/n): ").strip().lower() == 'y':
             while True:
@@ -304,6 +323,8 @@ def interactive_add_channel(channels_file):
                     break
                 else:
                     print("Let's re-enter the regex.\n")
+
+        videos, discarded = preview_recent_videos(url, criteria, playlist_end, url_regex)
 
         confirm = input("Are you happy with these filters? (y to accept, n to edit again, q to cancel): ").strip().lower()
         if confirm == 'y':
@@ -338,9 +359,11 @@ def interactive_edit_channel(channels_file):
     url = channel.get('url')
     criteria = channel.get('criteria', {})
     playlist_end = channel.get('playlist_end', 25)
+    current_regex = channel.get('url_regex')
+
     print(f"\nEditing: {url}")
 
-    videos, discarded = preview_recent_videos(url, criteria, playlist_end)
+    videos, discarded = preview_recent_videos(url, criteria, playlist_end, current_regex)
 
     confirm = input("Do you wish to edit these filters? (y to accept, anything else to cancel): ").strip().lower()
     if confirm != 'y':
@@ -391,7 +414,6 @@ def interactive_edit_channel(channels_file):
 
     channel['criteria'] = criteria
 
-    current_regex = channel.get('url_regex')
     print(f"\nCurrent URL regex: {current_regex}")
     action = input("Modify URL regex? (s=set new, c=clear, n=none): ").strip().lower()
 
@@ -423,7 +445,7 @@ def interactive_edit_channel(channels_file):
     elif action == 'c':
         channel['url_regex'] = None
 
-    preview_recent_videos(url, criteria, playlist_end)
+    preview_recent_videos(url, criteria, playlist_end, current_regex)
 
     confirm = input("Are you happy with these updated filters? (y to accept, n to edit again, q to cancel): ").strip().lower()
     if confirm == 'y':
