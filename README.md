@@ -1,6 +1,6 @@
 # ytdlp-telegram-filter-notify
 
-A lightweight YouTube watcher that monitors channels and sends Telegram messages for new uploads matching user-defined filters.
+A lightweight watcher that monitors channels and sends Telegram messages for new uploads matching user-defined filters.
 
 ## Features
 - Monitor YouTube channels for new uploads

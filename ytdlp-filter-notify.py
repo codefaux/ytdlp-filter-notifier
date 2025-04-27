@@ -416,7 +416,7 @@ def run_monitor(bot_token, chat_id, channels_file, cache_file, dry_run=False, su
 
 # === MAIN ===
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="YouTube channel monitor and Telegram notifier.")
+    parser = argparse.ArgumentParser(description="yt-dlp channel monitor and Telegram notifier.")
     parser.add_argument("mode", nargs="?", choices=["run", "add", "edit", "dry-run", "config"], default="run", help="Operation mode.")
     parser.add_argument("--data-dir", type=str, default=".", help="Directory to store config, channels and cache files.")
     parser.add_argument("--interval-hours", type=float, default=0.0, help="Interval in hours to repeat run mode. Default off.")

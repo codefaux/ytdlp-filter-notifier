@@ -1,5 +1,5 @@
 services:
-  youtube-notifier:
+  ytdlp-notifier:
     # build: .
     image: ghcr.io/codefaux/ytdlp-telegram-filter-notifier:latest
     container_name: ytdlp_notifier
