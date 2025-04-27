@@ -9,6 +9,7 @@ import time
 import random
 import argparse
 from datetime import datetime
+import prettytable
 
 # === CONFIGURATION ===
 HAMMER_DELAY_RANGE = (5, 8)  # Seconds between requests
@@ -47,7 +48,7 @@ def load_channels(channels_file, skip_add=False):
     channels = load_json(channels_file, [])
     if (not channels) and (not skip_add):
         print("No channels found. Let's add one.")
-        add_channel(channels_file)
+        interactive_add_channel(channels_file)
         channels = load_json(channels_file, [])
     return channels
 
@@ -71,13 +72,13 @@ def get_latest_videos(channel_url):
     ], capture_output=True, text=True)
     if result.returncode != 0:
         print("\033[91myt-dlp error:\033[0m", result.stderr)
-        return []
+        return [], None
     try:
         data = json.loads(result.stdout)
         return data.get('entries', []), data.get('channel')
     except json.JSONDecodeError:
         print("\033[91mFailed to parse yt-dlp output.\033[0m")
-        return []
+        return [], None
 
 def matches_filters(info, criteria):
     title = info.get('title', '').lower()
@@ -120,34 +121,92 @@ def send_telegram_message(bot_token, chat_id, text, dry_run=False):
     if response.status_code != 200:
         print("\033[91mFailed to send Telegram message:\033[0m", response.text)
 
-def add_channel(channels_file):
+def explain_skip_reason(info, criteria):
+    title = info.get('title', '').lower()
+    description = info.get('description', '').lower()
+    duration = info.get('duration', 0)
+
+    includes = criteria.get('title_include', [])
+    if includes and not any(word.lower() in title for word in includes):
+        return f"Title missing required keywords: {includes}"
+
+    excludes = criteria.get('title_exclude', [])
+    if any(word.lower() in title for word in excludes):
+        return f"Title contains excluded keywords: {excludes}"
+
+    desc_includes = criteria.get('description_include', [])
+    if desc_includes and not any(word.lower() in description for word in desc_includes):
+        return f"Description missing required keywords: {desc_includes}"
+
+    min_length = criteria.get('min_length_seconds', 0)
+    if min_length and duration < min_length:
+        return f"Duration too short ({duration}s < {min_length}s)"
+
+    max_length = criteria.get('max_length_seconds', 0)
+    if max_length and duration > max_length:
+        return f"Duration too long ({duration}s > {max_length}s)"
+
+    return "Matched"
+
+def interactive_add_channel(channels_file):
     url = input("Enter the channel URL: ").strip()
+
     criteria = {}
+    while True:
+        if input("Filter by title includes? (y/n): ").strip().lower() == 'y':
+            includes = input("Enter title keywords (comma separated): ").strip()
+            criteria['title_include'] = [word.strip() for word in includes.split(",")] if includes else []
 
-    if input("Filter by title includes? (y/n): ").strip().lower() == 'y':
-        includes = input("Enter title keywords (comma separated): ").strip()
-        criteria['title_include'] = [word.strip() for word in includes.split(",")] if includes else []
+        if input("Filter by title excludes? (y/n): ").strip().lower() == 'y':
+            excludes = input("Enter title exclude keywords (comma separated): ").strip()
+            criteria['title_exclude'] = [word.strip() for word in excludes.split(",")] if excludes else []
 
-    if input("Filter by title excludes? (y/n): ").strip().lower() == 'y':
-        excludes = input("Enter title exclude keywords (comma separated): ").strip()
-        criteria['title_exclude'] = [word.strip() for word in excludes.split(",")] if excludes else []
+        if input("Filter by description includes? (y/n): ").strip().lower() == 'y':
+            desc_includes = input("Enter description keywords (comma separated): ").strip()
+            criteria['description_include'] = [word.strip() for word in desc_includes.split(",")] if desc_includes else []
 
-    if input("Filter by description includes? (y/n): ").strip().lower() == 'y':
-        desc_includes = input("Enter description keywords (comma separated): ").strip()
-        criteria['description_include'] = [word.strip() for word in desc_includes.split(",")] if desc_includes else []
+        if input("Set minimum length (seconds)? (y/n): ").strip().lower() == 'y':
+            min_length = int(input("Enter minimum length in seconds: ").strip())
+            criteria['min_length_seconds'] = min_length
 
-    if input("Set minimum length (seconds)? (y/n): ").strip().lower() == 'y':
-        min_length = int(input("Enter minimum length in seconds: ").strip())
-        criteria['min_length_seconds'] = min_length
+        if input("Set maximum length (seconds)? (y/n): ").strip().lower() == 'y':
+            max_length = int(input("Enter maximum length in seconds: ").strip())
+            criteria['max_length_seconds'] = max_length
 
-    if input("Set maximum length (seconds)? (y/n): ").strip().lower() == 'y':
-        max_length = int(input("Enter maximum length in seconds: ").strip())
-        criteria['max_length_seconds'] = max_length
+        print("\nFetching recent videos to preview matches...")
+        videos, cname = get_latest_videos(url)
+        if not videos:
+            print("No videos found or error fetching.")
+            return
 
-    channels = load_channels(channels_file, skip_add=True)
-    channels.append({"url": url, "criteria": criteria})
-    save_channels(channels_file, channels)
-    print("Channel added.")
+        videos = videos[:15]
+
+        table = prettytable.PrettyTable()
+        table.field_names = ["Title", "Duration", "Result"]
+        table.max_width["Title"] = 60
+        for video in videos:
+            reason = explain_skip_reason(video, criteria)
+            duration = video.get('duration')
+            duration = f"{duration}s" if duration else "N/A"
+            title = video.get('title', 'N/A')
+            title = "\n".join([title[i:i+60] for i in range(0, len(title), 60)])
+            table.add_row([title, duration, reason])
+
+        print("\nRecent videos analysis:")
+        print(table)
+
+        confirm = input("Are you happy with these filters? (y to accept, n to edit again, q to cancel): ").strip().lower()
+        if confirm == 'y':
+            channels = load_channels(channels_file, skip_add=True)
+            channels.append({"url": url, "criteria": criteria})
+            save_channels(channels_file, channels)
+            print("Channel added.")
+            return
+        elif confirm == 'q':
+            print("Canceled.")
+            return
+        else:
+            print("Let's edit the filters again.\n")
 
 def run_monitor(bot_token, chat_id, channels_file, cache_file, dry_run=False, suppress_skip_msgs=False):
     channels = load_channels(channels_file)
@@ -207,7 +266,7 @@ if __name__ == "__main__":
     chat_id = config['telegram_chat_id']
 
     if args.mode == "add":
-        add_channel(channels_file)
+        interactive_add_channel(channels_file)
         sys.exit(0)
 
     dry_run = args.mode == "dry-run"
