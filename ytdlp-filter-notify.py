@@ -369,94 +369,94 @@ def interactive_edit_channel(channels_file):
     if confirm != 'y':
         return
 
-    # Allow editing playlist_end
-    try:
-        new_end = input(f"Current playlist_end={playlist_end}. Enter new value or leave blank to keep: ").strip()
-        if new_end:
-            channel['playlist_end'] = int(new_end)
-            playlist_end = channel['playlist_end']
-    except ValueError:
-        print("Invalid number. Keeping old playlist_end.")
+    while True:
+        try:
+            new_end = input(f"Current playlist_end={playlist_end}. Enter new value or leave blank to keep: ").strip()
+            if new_end:
+                channel['playlist_end'] = int(new_end)
+                playlist_end = channel['playlist_end']
+        except ValueError:
+            print("Invalid number. Keeping old playlist_end.")
 
-    # Editable fields
-    fields = [
-        ('title_include', list),
-        ('title_exclude', list),
-        ('description_include', list),
-        ('description_exclude', list),
-        ('min_length_seconds', int),
-        ('max_length_seconds', int),
-    ]
+        fields = [
+            ('title_include', list),
+            ('title_exclude', list),
+            ('description_include', list),
+            ('description_exclude', list),
+            ('min_length_seconds', int),
+            ('max_length_seconds', int),
+        ]
 
-    for field, ftype in fields:
-        current = criteria.get(field, [] if ftype is list else 0)
-        print(f"\nCurrent {field}: {current}")
-        action = input("Modify? (s=set, a=append, c=clear, n=none): ").strip().lower()
+        for field, ftype in fields:
+            current = criteria.get(field, [] if ftype is list else 0)
+            print(f"\nCurrent {field}: {current}")
+            action = input("Modify? (s=set, a=append, c=clear, n=none): ").strip().lower()
+
+            if action == 's':
+                if ftype is list:
+                    entries = input("Enter comma-separated values: ").strip()
+                    criteria[field] = [e.strip() for e in entries.split(",") if e.strip()]
+                else:
+                    try:
+                        criteria[field] = int(input("Enter new value: ").strip())
+                    except ValueError:
+                        print("Invalid input. Skipping.")
+            elif action == 'a' and ftype is list:
+                entries = input("Enter comma-separated values to append: ").strip()
+                criteria.setdefault(field, []).extend([e.strip() for e in entries.split(",") if e.strip()])
+            elif action == 'c':
+                criteria[field] = [] if ftype is list else 0
+            elif action == 'n':
+                pass
+            else:
+                print("Unknown action, skipping.")
+
+        channel['criteria'] = criteria
+
+        print(f"\nCurrent URL regex: {current_regex}")
+        action = input("Modify URL regex? (s=set new, c=clear, n=none): ").strip().lower()
 
         if action == 's':
-            if ftype is list:
-                entries = input("Enter comma-separated values: ").strip()
-                criteria[field] = [e.strip() for e in entries.split(",") if e.strip()]
-            else:
-                try:
-                    criteria[field] = int(input("Enter new value: ").strip())
-                except ValueError:
-                    print("Invalid input. Skipping.")
-        elif action == 'a' and ftype is list:
-            entries = input("Enter comma-separated values to append: ").strip()
-            criteria.setdefault(field, []).extend([e.strip() for e in entries.split(",") if e.strip()])
+            while True:
+                pattern = input("Enter new regex pattern: ").strip()
+                replacement = input("Enter new replacement string: ").strip()
+                new_url_regex = [pattern, replacement]
+
+                # Sample video preview
+                if videos:
+                    print("\nSample URL previews with your regex:")
+                    for sample_video in videos:
+                        original_url = sample_video.get('url', '')
+                        modified_url = original_url
+                        try:
+                            modified_url = re.sub(pattern, replacement, original_url)
+                        except Exception as e:
+                            print(f"\033[91mRegex error:\033[0m {e}")
+                        print(f"Original: {original_url}")
+                        print(f"Modified: {modified_url}\n")
+
+                confirm = input("Are you happy with this regex? (y to accept, n to re-enter): ").strip().lower()
+                if confirm == 'y':
+                    channel['url_regex'] = new_url_regex
+                    break
+                else:
+                    print("Let's re-enter the regex.\n")
         elif action == 'c':
-            criteria[field] = [] if ftype is list else 0
-        elif action == 'n':
-            pass
+            channel['url_regex'] = None
+
+        preview_recent_videos(url, criteria, playlist_end, current_regex)
+
+        confirm = input("Are you happy with these filters? (y to save, e to edit again, n to abort): ").strip().lower()
+        if confirm == 'y':
+            channels[selection] = channel
+            save_channels(channels_file, channels)
+            print("Channel updated.")
+            break
+        elif confirm == 'n':
+            print("Canceled changes.")
+            break
         else:
-            print("Unknown action, skipping.")
-
-    channel['criteria'] = criteria
-
-    print(f"\nCurrent URL regex: {current_regex}")
-    action = input("Modify URL regex? (s=set new, c=clear, n=none): ").strip().lower()
-
-    if action == 's':
-        while True:
-            pattern = input("Enter new regex pattern: ").strip()
-            replacement = input("Enter new replacement string: ").strip()
-            new_url_regex = [pattern, replacement]
-
-            # Sample video preview
-            if videos:
-                print("\nSample URL previews with your regex:")
-                for sample_video in videos:
-                    original_url = sample_video.get('url', '')
-                    modified_url = original_url
-                    try:
-                        modified_url = re.sub(pattern, replacement, original_url)
-                    except Exception as e:
-                        print(f"\033[91mRegex error:\033[0m {e}")
-                    print(f"Original: {original_url}")
-                    print(f"Modified: {modified_url}\n")
-
-            confirm = input("Are you happy with this regex? (y to accept, n to re-enter): ").strip().lower()
-            if confirm == 'y':
-                channel['url_regex'] = new_url_regex
-                break
-            else:
-                print("Let's re-enter the regex.\n")
-    elif action == 'c':
-        channel['url_regex'] = None
-
-    preview_recent_videos(url, criteria, playlist_end, current_regex)
-
-    confirm = input("Are you happy with these updated filters? (y to accept, n to edit again, q to cancel): ").strip().lower()
-    if confirm == 'y':
-        channels[selection] = channel
-        save_channels(channels_file, channels)
-        print("Channel updated.")
-    elif confirm == 'q':
-        print("Canceled changes.")
-    else:
-        print("Let's edit again.\n")
-        interactive_edit_channel(channels_file)
+            print("Let's edit again.\n")
 
 def run_monitor(bot_token, chat_id, channels_file, cache_file, dry_run=False, suppress_skip_msgs=False):
     channels = load_channels(channels_file)
