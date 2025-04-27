@@ -147,7 +147,7 @@ def add_channel(channels_file):
     save_channels(channels_file, channels)
     print("Channel added.")
 
-def run_monitor(bot_token, chat_id, channels_file, cache_file, dry_run=False):
+def run_monitor(bot_token, chat_id, channels_file, cache_file, dry_run=False, suppress_skip_msgs=False):
     channels = load_channels(channels_file)
     seen_videos = load_cache(cache_file)
 
@@ -164,7 +164,8 @@ def run_monitor(bot_token, chat_id, channels_file, cache_file, dry_run=False):
         for video in videos[:5]:
             video_id = video['id']
             if video_id in channel_cache:
-                print("\033[90mAlready notified for:\033[0m", video_id)
+                if not suppress_skip_msgs:
+                    print("\033[90mAlready notified for:\033[0m", video_id)
                 continue
             if matches_filters(video, criteria):
                 message = f"{cname} :: {video['title']}\n\nhttps://www.youtube.com/watch?v={video_id}"
@@ -172,7 +173,8 @@ def run_monitor(bot_token, chat_id, channels_file, cache_file, dry_run=False):
                 print("\033[92mNotified for:\033[0m", video['title'])
                 channel_cache.add(video_id)
             else:
-                print("\033[93mSkipped:\033[0m", video['title'])
+                if not suppress_skip_msgs:
+                    print("\033[93mSkipped:\033[0m", video['title'])
 
         seen_videos[url] = list(channel_cache)
         time.sleep(random.randint(*HAMMER_DELAY_RANGE))
@@ -185,6 +187,7 @@ if __name__ == "__main__":
     parser.add_argument("mode", nargs="?", choices=["run", "add", "dry-run", "config"], default="run", help="Operation mode.")
     parser.add_argument("--data-dir", type=str, default=".", help="Directory to store config, channels and cache files.")
     parser.add_argument("--interval-hours", type=float, default=0.0, help="Interval in hours to repeat run mode. Default off.")
+    parser.add_argument("--suppress-skip-msgs", action="store_true", help="Suppress skipped/already-seen video messages.")
     args = parser.parse_args()
 
     data_dir = args.data_dir
@@ -209,8 +212,8 @@ if __name__ == "__main__":
 
     if args.mode in ("run", "dry-run"):
         while True:
-            run_monitor(bot_token, chat_id, channels_file, cache_file, dry_run=dry_run)
+            run_monitor(bot_token, chat_id, channels_file, cache_file, dry_run=dry_run, suppress_skip_msgs=args.suppress_skip_msgs)
             if args.interval_hours <= 0:
                 break
-            print(f"Sleeping for {args.interval_hours} hours before next scan...")
+            print(f"\033[94mSleeping for {args.interval_hours} hours before next scan...\033[0m")
             time.sleep(args.interval_hours * 3600)

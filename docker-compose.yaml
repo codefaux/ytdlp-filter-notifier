@@ -1,8 +1,9 @@
 services:
   youtube-notifier:
     build: .
+    image: ytdlp-notifier:local
     container_name: ytdlp_notifier
     restart: unless-stopped
     volumes:
       - ./data:/data
-    command: ["python", "ytdlp-filter-notify.py", "run", "--data-dir", "/data", "--interval-hours", "1"]
+    command: ["python", "ytdlp-filter-notify.py", "run", "--suppress-skip-msgs", "--data-dir", "/data", "--interval-hours", "1"]
