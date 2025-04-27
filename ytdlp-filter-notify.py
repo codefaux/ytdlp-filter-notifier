@@ -163,16 +163,31 @@ def preview_recent_videos(url, criteria, playlist_end):
         print("No videos found or error fetching.")
         return None, None
 
+    # ANSI color codes
+    GREEN = '\033[92m'
+    RED = '\033[91m'
+    RESET = '\033[0m'
+
     table = prettytable.PrettyTable()
     table.field_names = ["Title", "Duration", "Result"]
-    table.max_width["Title"] = 60
+    table.max_width["Title"] = 70
+
     for video in videos:
         reason = explain_skip_reason(video, criteria)
         duration = video.get('duration')
         duration = f"{duration}s" if duration else "N/A"
-        title = video.get('title', 'N/A')
-        title = "\n".join([title[i:i+60] for i in range(0, len(title), 60)])
-        table.add_row([title, duration, reason])
+        raw_title = video.get('title', 'N/A')
+
+        title_lines = [raw_title[i:i+60] for i in range(0, len(raw_title), 60)]
+
+        if reason == "Matched":
+            colored_lines = [f"{GREEN}{line}{RESET}" for line in title_lines]
+        else:
+            colored_lines = [f"{RED}{line}{RESET}" for line in title_lines]
+
+        color_title = "\n".join(colored_lines)
+
+        table.add_row([color_title, duration, reason])
 
     print("\nRecent videos analysis:")
     print(table)
