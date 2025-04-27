@@ -317,6 +317,10 @@ def interactive_edit_channel(channels_file):
 
     preview_recent_videos(url, criteria, playlist_end)
 
+    confirm = input("Do you wish to edit these filters? (y to accept, anything else to cancel): ").strip().lower()
+    if confirm != 'y':
+        return
+
     # Allow editing playlist_end
     try:
         new_end = input(f"Current playlist_end={playlist_end}. Enter new value or leave blank to keep: ").strip()
