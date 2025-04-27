@@ -173,7 +173,6 @@ def preview_recent_videos(url, criteria, playlist_end, url_regex=None):
 
     if url_regex:
         table.field_names = ["Title", "Duration", "Result", "URL"]
-        # table.field_names.append("URL")
         table.max_width["URL"] =  60
     else:
         table.field_names = ["Title", "Duration", "Result"]
@@ -305,10 +304,9 @@ def interactive_add_channel(channels_file):
                 replacement = input("Enter replacement string: ").strip()
                 url_regex = [pattern, replacement]
 
-                # Sample video preview
                 if videos:
                     print("\nSample URL previews with your regex:")
-                    for sample_video in videos:  # show up to 5
+                    for sample_video in videos:
                         original_url = sample_video.get('url', '')
                         modified_url = original_url
                         try:
@@ -422,7 +420,6 @@ def interactive_edit_channel(channels_file):
                 replacement = input("Enter new replacement string: ").strip()
                 new_url_regex = [pattern, replacement]
 
-                # Sample video preview
                 if videos:
                     print("\nSample URL previews with your regex:")
                     for sample_video in videos:
