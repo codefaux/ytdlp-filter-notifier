@@ -173,6 +173,29 @@ def send_telegram_message(text, dry_run=False):
 
     time.sleep(1)
 
+def print_channel_settings(channel):
+    url = channel.get('url', 'N/A')
+    playlist_end = channel.get('playlist_end', 'N/A')
+    criteria = channel.get('criteria', {})
+    url_regex = channel.get('url_regex')
+
+    print(f"\n{ANSI_GREEN}Channel URL:{ANSI_RESET} {url}")
+    print(f"{ANSI_GREEN}Playlist End:{ANSI_RESET} {playlist_end}")
+
+    if criteria:
+        print(f"{ANSI_GREEN}Filter Criteria:{ANSI_RESET}")
+        for key, value in criteria.items():
+            print(f"  {key}: {value}")
+    else:
+        print(f"{ANSI_GREEN}Filter Criteria:{ANSI_RESET} None")
+
+    if url_regex:
+        pattern, replacement = url_regex
+        print(f"{ANSI_GREEN}URL Regex Pattern:{ANSI_RESET} {pattern}")
+        print(f"{ANSI_GREEN}URL Regex Replacement:{ANSI_RESET} {replacement}")
+    else:
+        print(f"{ANSI_GREEN}URL Regex:{ANSI_RESET} None")
+
 def preview_recent_videos(url, criteria, playlist_end, url_regex=None, skip_result=False):
     print("\nFetching recent videos to preview matches...")
     videos, cname = get_latest_videos(url, playlist_end=playlist_end)
@@ -453,6 +476,7 @@ def interactive_add_channel(channels_file):
             url_regex = choose_url_regex()
 
         videos, discarded = preview_recent_videos(url, criteria, playlist_end, url_regex, skip_result=False)
+        print_channel_settings(channel)
 
         confirm = input("Are you happy with these filters? (y to accept, n to edit again, q to cancel): ").strip().lower()
         if confirm == 'y':
@@ -495,7 +519,8 @@ def interactive_edit_channel(channels_file):
     print(f"\nEditing: {url}")
 
     videos, discarded = preview_recent_videos(url, criteria, playlist_end, current_regex)
-
+    print_channel_settings(channel)
+    
     confirm = input("Do you wish to edit these filters? (y to edit, anything else to cancel): ").strip().lower()
     if confirm != 'y':
         return
@@ -573,6 +598,7 @@ def interactive_edit_channel(channels_file):
             channel['url_regex'] = None
 
         preview_recent_videos(url, criteria, playlist_end, current_regex)
+        print_channel_settings(channel)
 
         confirm = input("Are you happy with these filters? (y to save, e to edit again, n to abort): ").strip().lower()
         if confirm == 'y':
