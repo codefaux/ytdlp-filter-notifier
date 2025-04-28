@@ -1,9 +1,11 @@
 Todo/Might-do
 
-- Handle URL error
-- Handle regex error
-- mod preview_recent_videos for non-match use (include orig. URL)
-- stop faster
-- preview URLs when prompting regex
 - regex presets
-- prompt notify for channel on add/edit
+- stop faster
+
+
+- CLI capable add/edit w/params in function args w/ defaults
+- add/edit iterate var array w/ datum name
+-- plural = array input, singular = value input
+
+- live preview mode w/ panels?
