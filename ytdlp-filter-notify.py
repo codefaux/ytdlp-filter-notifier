@@ -263,7 +263,6 @@ def explain_skip_reason(info, criteria):
     return "\n".join(reasons) if reasons else "Matched"
 
 def interactive_add_channel(channels_file):
-    # TODO: Handle URL error, handle regex error, mod preview_recent_videos for non-match use (include orig. URL)
 
     url = input("Enter the channel URL: ").strip()
 
