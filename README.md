@@ -62,6 +62,7 @@ When you run in `add` mode (`python3 ytdlp-filter-notify.py add` `./ytdlp-filter
 - Optionally set title and description include / exclude keywords
 - Optionally set minimum/maximum video length in seconds
 - Optionally set regex pattern and replacement for outgoing URL
+- - You may manually specify a regex pattern and replacement, configure and use named presets, or import presets from another channel
 The script will provide a preview of `count` videos, marked to indicate decisions, with in/out URL display for you to confirm.
 
 ## Editing Channels
@@ -70,6 +71,9 @@ When you run in `edit` mode (`python3 ytdlp-filter-notify.py edit` `./ytdlp-filt
 - Adjust count of recent videos, min/max length in seconds
 - Adjust keyword lists (set, append, clear)
 - Adjust regex (set, clear)
+
+## Editing URL Regex Presets
+When you run in 'regex' mode `python3 ytdlp-filter-notify.py edit` `./ytdlp-filter-notify.py edit` or Docker equivalent), the script will allow you to add or edit existing presets.
 
 ## Notes
 - Default data directory is `./` manually, `/data` in Docker

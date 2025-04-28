@@ -1,6 +1,5 @@
 Todo/Might-do
 
-- regex presets
 - stop faster
 
 
