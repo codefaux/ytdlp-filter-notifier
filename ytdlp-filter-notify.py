@@ -14,6 +14,14 @@ import re
 
 # === CONFIGURATION ===
 HAMMER_DELAY_RANGE = (2, 4)  # Seconds between requests
+cache_file = ""
+
+# ANSI color codes
+ANSI_BLUE = '\033[94m'
+ANSI_YELLOW = '\033[93m'
+ANSI_GREEN = '\033[92m'
+ANSI_RED = '\033[91m'
+ANSI_RESET = '\033[0m'
 
 # === FUNCTIONS ===
 def ensure_dir(directory):
@@ -76,13 +84,13 @@ def get_latest_videos(channel_url, playlist_end=None):
 
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        print("\033[91myt-dlp error:\033[0m", result.stderr)
+        print(f"{ANSI_RED}yt-dlp error:{ANSI_RESET}", result.stderr)
         return [], None
     try:
         data = json.loads(result.stdout)
         return data.get('entries', [])[::-1], data.get('channel') or data.get('title') or data.get('uploader')
     except json.JSONDecodeError:
-        print("\033[91mFailed to parse yt-dlp output.\033[0m")
+        print(f"{ANSI_RED}Failed to parse yt-dlp output.{ANSI_RESET}")
         return [], None
 
 def matches_filters(info, criteria):
@@ -116,10 +124,16 @@ def matches_filters(info, criteria):
 
     return True
 
-def send_telegram_message(bot_token, chat_id, text, dry_run=False):
+def send_telegram_message(text, dry_run=False):
+    config = load_config(config_file)
+    bot_token = config['telegram_bot_token']
+    chat_id = config['telegram_chat_id']
+
     if dry_run:
-        print(f"\033[94m[Dry-Run]\033[0m {text}")
+        print(f"{ANSI_BLUE}[Dry-Run] Notification: {ANSI_RESET} {text}")
         return
+    else:
+        print(f"{ANSI_GREEN}Sending Notifiation: {ANSI_RESET} {text}")
 
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {
@@ -139,23 +153,23 @@ def send_telegram_message(bot_token, chat_id, text, dry_run=False):
             try:
                 retry_after = response.json().get('parameters', {}).get('retry_after')
                 if retry_after is None:
-                    print("\033[91mRate limit encountered, but retry_after missing. Exiting.\033[0m")
+                    print(f"{ANSI_RED}Rate limit encountered, but retry_after missing. Exiting.{ANSI_RESET}")
                     sys.exit(1)
-                print(f"\033[93mRate limited by Telegram. Retrying after {retry_after} seconds...\033[0m")
+                print(f"{ANSI_YELLOW}Rate limited by Telegram. Retrying after {retry_after} seconds...{ANSI_RESET}")
                 time.sleep(retry_after + 3)
                 retries += 1
             except (ValueError, KeyError, json.JSONDecodeError):
-                print("\033[91mRate limit encountered, but failed to parse retry_after. Exiting.\033[0m")
+                print(f"{ANSI_RED}Rate limit encountered, but failed to parse retry_after. Exiting.{ANSI_RESET}")
                 sys.exit(1)
         else:
-            print(f"\033[91mFailed to send Telegram message (HTTP {response.status_code}):\033[0m", response.text)
+            print(f"{ANSI_RED}Failed to send Telegram message (HTTP {response.status_code}):{ANSI_RESET} {response.text}")
             sys.exit(1)
 
     if retries > max_retries:
-        print("\033[91mExceeded maximum retries. Exiting.\033[0m")
+        print(f"{ANSI_RED}Exceeded maximum retries. Exiting.{ANSI_RESET}")
         sys.exit(1)
 
-    time.sleep(2)
+    time.sleep(1)
 
 def preview_recent_videos(url, criteria, playlist_end, url_regex=None, skip_result=False):
     print("\nFetching recent videos to preview matches...")
@@ -163,11 +177,6 @@ def preview_recent_videos(url, criteria, playlist_end, url_regex=None, skip_resu
     if not videos:
         print("No videos found or error fetching.")
         return None, None
-
-    # ANSI color codes
-    GREEN = '\033[92m'
-    RED = '\033[91m'
-    RESET = '\033[0m'
 
     table = prettytable.PrettyTable()
 
@@ -203,16 +212,16 @@ def preview_recent_videos(url, criteria, playlist_end, url_regex=None, skip_resu
         title_lines = [raw_title[i:i+60] for i in range(0, len(raw_title), 60)]
 
         if reason == "Matched" and not skip_result:
-            colored_title_lines = [f"{GREEN}{line}{RESET}" for line in title_lines]
-            colored_duration = f"{GREEN}{duration_str}{RESET}"
+            colored_title_lines = [f"{ANSI_GREEN}{line}{ANSI_RESET}" for line in title_lines]
+            colored_duration = f"{ANSI_GREEN}{duration_str}{ANSI_RESET}"
         else:
             if "title" in reason.lower() and not skip_result:
-                colored_title_lines = [f"{RED}{line}{RESET}" for line in title_lines]
+                colored_title_lines = [f"{ANSI_RED}{line}{ANSI_RESET}" for line in title_lines]
             else:
                 colored_title_lines = title_lines
 
             if ("short" in reason.lower() or "long" in reason.lower()) and not skip_result:
-                colored_duration = f"{RED}{duration_str}{RESET}"
+                colored_duration = f"{ANSI_RED}{duration_str}{ANSI_RESET}"
             else:
                 colored_duration = duration_str
 
@@ -220,7 +229,7 @@ def preview_recent_videos(url, criteria, playlist_end, url_regex=None, skip_resu
             
 
         if url_regex:
-            url_display = f"{RED}IN:{RESET}{video_url}\n{GREEN}OUT:{RESET}{modified_url}"
+            url_display = f"{ANSI_RED}IN:{ANSI_RESET}{video_url}\n{ANSI_GREEN}OUT:{ANSI_RESET}{modified_url}"
         else:
             url_display = f"{video_url}"
 
@@ -319,6 +328,7 @@ def interactive_add_channel(channels_file):
 
                 if videos:
                     print("\nSample URL previews with your regex:")
+                    regex_error = False
                     for sample_video in videos:
                         original_url = sample_video.get('url', '')
                         modified_url = None
@@ -326,7 +336,7 @@ def interactive_add_channel(channels_file):
                             modified_url = re.sub(pattern, replacement, original_url)
                         except Exception as e:
                             regex_error = True
-                            print(f"\033[91mRegex error:\033[0m {e}")
+                            print(f"{ANSI_RED}Regex error:{ANSI_RESET} {e}")
                         print(f"Original: {original_url}")
                         print(f"Modified: {modified_url}\n")
 
@@ -341,10 +351,13 @@ def interactive_add_channel(channels_file):
 
         confirm = input("Are you happy with these filters? (y to accept, n to edit again, q to cancel): ").strip().lower()
         if confirm == 'y':
+            channel = {"url": url, "criteria": criteria, "playlist_end": playlist_end, "url_regex": url_regex}
             channels = load_channels(channels_file, skip_add=True)
-            channels.append({"url": url, "criteria": criteria, "playlist_end": playlist_end, "url_regex": url_regex})
+            channels.append(channel)
             save_channels(channels_file, channels)
             print("Channel added.")
+            if input("Would you like to run notifications for this channel? (y/n): ").strip().lower() == 'y':
+                run_channel(channel, dry_run=False, suppress_skip_msgs=False, seen_during_dry_run=False)
             return
         elif confirm == 'q':
             print("Canceled.")
@@ -443,7 +456,7 @@ def interactive_edit_channel(channels_file):
                         try:
                             modified_url = re.sub(pattern, replacement, original_url)
                         except Exception as e:
-                            print(f"\033[91mRegex error:\033[0m {e}")
+                            print(f"{ANSI_RED}Regex error:{ANSI_RESET} {e}")
                         print(f"Original: {original_url}")
                         print(f"Modified: {modified_url}\n")
 
@@ -463,6 +476,8 @@ def interactive_edit_channel(channels_file):
             channels[selection] = channel
             save_channels(channels_file, channels)
             print("Channel updated.")
+            if input("Would you like to run notifications for this channel? (y/n): ").strip().lower() == 'y':
+                run_channel(channel, dry_run=False, suppress_skip_msgs=False, seen_during_dry_run=False)
             break
         elif confirm == 'n':
             print("Canceled changes.")
@@ -470,58 +485,64 @@ def interactive_edit_channel(channels_file):
         else:
             print("Let's edit again.\n")
 
-def run_monitor(bot_token, chat_id, channels_file, cache_file, dry_run=False, suppress_skip_msgs=False):
+def run_all_channels(channels_file, dry_run=False, suppress_skip_msgs=False, seen_during_dry_run=False):
     channels = load_channels(channels_file)
-    seen_videos = load_cache(cache_file)
 
     for channel in channels:
-        url = channel.get('url')
-        criteria = channel.get('criteria', {})
-        playlist_end = channel.get('playlist_end', 25)
-        url_regex = channel.get('url_regex')
-
-        if not url:
-            continue
-
-        print(f"\033[92mChecking channel:\033[0m {url}")
-        videos, cname = get_latest_videos(url, playlist_end=playlist_end)
-        channel_cache = set(seen_videos.get(url, []))
-
-        for video in videos:
-            video_id = video['id']
-            if video_id in channel_cache:
-                if not suppress_skip_msgs:
-                    print("\033[90mAlready notified for:\033[0m", video_id)
-                continue
-            if matches_filters(video, criteria):
-                video_url = video['url']
-                if url_regex:
-                    try:
-                        pattern, repl = url_regex
-                        video_url = re.sub(pattern, repl, video_url)
-                    except Exception as e:
-                        print(f"\033[91mFailed applying URL regex:\033[0m {e}")
-
-                message = f"{cname} :: {video['title']}\n\n{video_url}"
-                print("\033[92mNotified for:\033[0m", video['title'])
-                send_telegram_message(bot_token, chat_id, message, dry_run=dry_run)
-                channel_cache.add(video_id)
-            else:
-                if not suppress_skip_msgs:
-                    print("\033[Not matched:\033[0m", video['title'])
-
-        seen_videos[url] = list(channel_cache)
+        run_channel(channel, dry_run, suppress_skip_msgs, seen_during_dry_run)
         time.sleep(random.randint(*HAMMER_DELAY_RANGE))
 
+
+
+def run_channel(channel, dry_run=False, suppress_skip_msgs=False, seen_during_dry_run=False):
+    url = channel.get('url')
+    criteria = channel.get('criteria', {})
+    playlist_end = channel.get('playlist_end', 25)
+    url_regex = channel.get('url_regex')
+    seen_videos = load_cache(cache_file)
+
+    if not url:
+        return
+
+    print(f"{ANSI_GREEN}Checking channel:{ANSI_RESET} {url}")
+    videos, cname = get_latest_videos(url, playlist_end=playlist_end)
+    channel_cache = set(seen_videos.get(url, []))
+
+    for video in videos:
+        video_id = video['id']
+        if video_id in channel_cache:
+            if not suppress_skip_msgs:
+                print(f"\033[90mAlready seen:{ANSI_RESET} {video_id} -- {video['title']}")
+            continue
+        if matches_filters(video, criteria):
+            video_url = video['url']
+            if url_regex:
+                try:
+                    pattern, repl = url_regex
+                    video_url = re.sub(pattern, repl, video_url)
+                except Exception as e:
+                    print(f"{ANSI_RED}Failed applying URL regex:{ANSI_RESET} {e}")
+
+            message = f"{cname} :: {video['title']}\n\n{video_url}"
+            send_telegram_message(message, dry_run=dry_run)
+            if seen_during_dry_run or not dry_run:
+                channel_cache.add(video_id)
+        else:
+            if not suppress_skip_msgs:
+                print(f"{ANSI_YELLOW}Not matched:{ANSI_RESET} {video_id} -- {video['title']}")
+
+    seen_videos[url] = list(channel_cache)
     save_cache(cache_file, seen_videos)
+    return
 
 # === MAIN ===
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="yt-dlp channel monitor and Telegram notifier.")
-    parser.add_argument("mode", nargs="?", choices=["run", "add", "edit", "dry-run", "config"], default="run", help="Operation mode.")
+    parser.add_argument("mode", nargs="?", choices=["run", "add", "edit", "dry-run", "config"], default="dry-run", help="Operation mode.")
     parser.add_argument("--data-dir", type=str, default=".", help="Directory to store config, channels and cache files.")
     parser.add_argument("--interval-hours", type=float, default=0.0, help="Interval in hours to repeat run mode. Default off.")
     parser.add_argument("--suppress-skip-msgs", action="store_true", help="Suppress not matched/already-seen video messages.")
+    parser.add_argument("--seen-during-dry-run", action="store_true", help="Mark videos as seen during dry-run.")
     args = parser.parse_args()
 
     data_dir = args.data_dir
@@ -543,8 +564,6 @@ if __name__ == "__main__":
         sys.exit(0)
 
     config = load_config(config_file)
-    bot_token = config['telegram_bot_token']
-    chat_id = config['telegram_chat_id']
 
     if args.mode == "add":
         interactive_add_channel(channels_file)
@@ -558,8 +577,8 @@ if __name__ == "__main__":
 
     if args.mode in ("run", "dry-run"):
         while True:
-            run_monitor(bot_token, chat_id, channels_file, cache_file, dry_run=dry_run, suppress_skip_msgs=args.suppress_skip_msgs)
+            run_all_channels(channels_file, dry_run=dry_run, suppress_skip_msgs=args.suppress_skip_msgs, seen_during_dry_run=args.seen_during_dry_run)
             if args.interval_hours <= 0:
                 break
-            print(f"\033[94mSleeping for {args.interval_hours} hours before next scan...\033[0m")
+            print(f"{ANSI_BLUE}Sleeping for {args.interval_hours} hours before next scan...{ANSI_RESET}")
             time.sleep(args.interval_hours * 3600)
