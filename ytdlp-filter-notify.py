@@ -157,7 +157,7 @@ def send_telegram_message(bot_token, chat_id, text, dry_run=False):
 
     time.sleep(2)
 
-def preview_recent_videos(url, criteria, playlist_end, url_regex=None):
+def preview_recent_videos(url, criteria, playlist_end, url_regex=None, skip_result=False):
     print("\nFetching recent videos to preview matches...")
     videos, cname = get_latest_videos(url, playlist_end=playlist_end)
     if not videos:
@@ -171,13 +171,12 @@ def preview_recent_videos(url, criteria, playlist_end, url_regex=None):
 
     table = prettytable.PrettyTable()
 
-    if url_regex:
-        table.field_names = ["Title", "Duration", "Result", "URL"]
-        table.max_width["URL"] =  60
+    if skip_result:
+        table.field_names = ["Title", "Duration", "URL"]
     else:
-        table.field_names = ["Title", "Duration", "Result"]
+        table.field_names = ["Title", "Duration", "Result", "URL"]
 
-
+    table.max_width["URL"] =  60
     table.max_width["Title"] = 70
     table.hrules = prettytable.HRuleStyle.ALL
 
@@ -203,27 +202,32 @@ def preview_recent_videos(url, criteria, playlist_end, url_regex=None):
 
         title_lines = [raw_title[i:i+60] for i in range(0, len(raw_title), 60)]
 
-        if reason == "Matched":
+        if reason == "Matched" and not skip_result:
             colored_title_lines = [f"{GREEN}{line}{RESET}" for line in title_lines]
             colored_duration = f"{GREEN}{duration_str}{RESET}"
         else:
-            if "title" in reason.lower():
+            if "title" in reason.lower() and not skip_result:
                 colored_title_lines = [f"{RED}{line}{RESET}" for line in title_lines]
             else:
                 colored_title_lines = title_lines
 
-            if "short" in reason.lower() or "long" in reason.lower():
+            if ("short" in reason.lower() or "long" in reason.lower()) and not skip_result:
                 colored_duration = f"{RED}{duration_str}{RESET}"
             else:
                 colored_duration = duration_str
 
         color_title = "\n".join(colored_title_lines)
+            
 
         if url_regex:
             url_display = f"{RED}IN:{RESET}{video_url}\n{GREEN}OUT:{RESET}{modified_url}"
-            table.add_row([color_title, colored_duration, reason, url_display])
         else:
-            table.add_row([color_title, colored_duration, reason])
+            url_display = f"{video_url}"
+
+        if skip_result:
+            table.add_row([color_title, colored_duration, url_display])
+        else:
+            table.add_row([color_title, colored_duration, reason, url_display])
 
     print("\nRecent videos analysis:")
     print(table)
@@ -269,7 +273,7 @@ def interactive_add_channel(channels_file):
 
     while True:
         url = input("Enter the channel URL: ").strip()
-        videos, discarded = preview_recent_videos(url, criteria, playlist_end, url_regex)
+        videos, discarded = preview_recent_videos(url, criteria, playlist_end, url_regex, skip_result=True)
 
         if videos:
             break
@@ -317,21 +321,23 @@ def interactive_add_channel(channels_file):
                     print("\nSample URL previews with your regex:")
                     for sample_video in videos:
                         original_url = sample_video.get('url', '')
-                        modified_url = original_url
+                        modified_url = None
                         try:
                             modified_url = re.sub(pattern, replacement, original_url)
                         except Exception as e:
+                            regex_error = True
                             print(f"\033[91mRegex error:\033[0m {e}")
                         print(f"Original: {original_url}")
                         print(f"Modified: {modified_url}\n")
 
-                confirm = input("Are you happy with this regex? (y to accept, n to re-enter): ").strip().lower()
-                if confirm == 'y':
-                    break
-                else:
-                    print("Let's re-enter the regex.\n")
+                if not regex_error:
+                    confirm = input("Are you happy with this regex? (y to accept, n to re-enter): ").strip().lower()
+                    if confirm == 'y':
+                        break
 
-        videos, discarded = preview_recent_videos(url, criteria, playlist_end, url_regex)
+                print("Let's re-enter the regex.\n")
+
+        videos, discarded = preview_recent_videos(url, criteria, playlist_end, url_regex, skip_result=True)
 
         confirm = input("Are you happy with these filters? (y to accept, n to edit again, q to cancel): ").strip().lower()
         if confirm == 'y':
