@@ -499,7 +499,7 @@ def run_monitor(bot_token, chat_id, channels_file, cache_file, dry_run=False, su
                 channel_cache.add(video_id)
             else:
                 if not suppress_skip_msgs:
-                    print("\033[93mSkipped:\033[0m", video['title'])
+                    print("\033[Not matched:\033[0m", video['title'])
 
         seen_videos[url] = list(channel_cache)
         time.sleep(random.randint(*HAMMER_DELAY_RANGE))
@@ -512,7 +512,7 @@ if __name__ == "__main__":
     parser.add_argument("mode", nargs="?", choices=["run", "add", "edit", "dry-run", "config"], default="run", help="Operation mode.")
     parser.add_argument("--data-dir", type=str, default=".", help="Directory to store config, channels and cache files.")
     parser.add_argument("--interval-hours", type=float, default=0.0, help="Interval in hours to repeat run mode. Default off.")
-    parser.add_argument("--suppress-skip-msgs", action="store_true", help="Suppress skipped/already-seen video messages.")
+    parser.add_argument("--suppress-skip-msgs", action="store_true", help="Suppress not matched/already-seen video messages.")
     args = parser.parse_args()
 
     data_dir = args.data_dir
