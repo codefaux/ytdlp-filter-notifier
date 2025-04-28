@@ -275,6 +275,68 @@ def explain_skip_reason(info, criteria):
 
     return "\n".join(reasons) if reasons else "Matched"
 
+def load_regex_presets(presets_file):
+    return load_json(presets_file, {})
+
+def save_regex_presets(presets_file, presets):
+    save_json(presets_file, presets)
+
+def interactive_edit_regex_presets(presets_file):
+    presets = load_regex_presets(presets_file)
+
+    while True:
+        print("\nCurrent Presets:")
+        for idx, (name, (pattern, replacement)) in enumerate(presets.items()):
+            print(f"[{idx}] {name} =>\n\tpattern: {pattern},\n\treplacement: {replacement}")
+
+        action = input("\nSelect action: (a=add new, e=edit existing, d=delete, q=quit): ").strip().lower()
+
+        if action == 'a':
+            name = input("Enter new preset name: ").strip()
+            if name in presets:
+                print(f"{ANSI_RED}Preset already exists.{ANSI_RESET}")
+                continue
+            pattern = input("Enter regex pattern: ").strip()
+            replacement = input("Enter replacement string: ").strip()
+            presets[name] = [pattern, replacement]
+            save_regex_presets(presets_file, presets)
+            print(f"{ANSI_GREEN}Preset '{name}' added.{ANSI_RESET}")
+
+        elif action == 'e':
+            try:
+                idx = int(input("Enter preset number to edit: ").strip())
+                name = list(presets.keys())[idx]
+                print(f"Editing preset: {name}")
+                pattern = input(f"Enter new regex pattern (leave blank to keep '{presets[name][0]}'): ").strip()
+                replacement = input(f"Enter new replacement string (leave blank to keep '{presets[name][1]}'): ").strip()
+                if pattern:
+                    presets[name][0] = pattern
+                if replacement:
+                    presets[name][1] = replacement
+                save_regex_presets(presets_file, presets)
+                print(f"{ANSI_GREEN}Preset '{name}' updated.{ANSI_RESET}")
+            except (ValueError, IndexError):
+                print(f"{ANSI_RED}Invalid selection.{ANSI_RESET}")
+
+        elif action == 'd':
+            try:
+                idx = int(input("Enter preset number to delete: ").strip())
+                name = list(presets.keys())[idx]
+                confirm = input(f"Are you sure you want to delete preset '{name}'? (y/n): ").strip().lower()
+                if confirm == 'y':
+                    del presets[name]
+                    save_regex_presets(presets_file, presets)
+                    print(f"{ANSI_GREEN}Preset '{name}' deleted.{ANSI_RESET}")
+            except (ValueError, IndexError):
+                print(f"{ANSI_RED}Invalid selection.{ANSI_RESET}")
+
+        elif action == 'q':
+            print("Exiting regex preset editor.")
+            break
+
+        else:
+            print(f"{ANSI_RED}Unknown action.{ANSI_RESET}")
+
 def interactive_add_channel(channels_file):
     criteria = {}
     playlist_end = 25
@@ -538,7 +600,7 @@ def run_channel(channel, dry_run=False, suppress_skip_msgs=False, seen_during_dr
 # === MAIN ===
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="yt-dlp channel monitor and Telegram notifier.")
-    parser.add_argument("mode", nargs="?", choices=["run", "add", "edit", "dry-run", "config"], default="dry-run", help="Operation mode.")
+    parser.add_argument("mode", nargs="?", choices=["run", "add", "edit", "regex", "dry-run", "config"], default="dry-run", help="Operation mode.")
     parser.add_argument("--data-dir", type=str, default=".", help="Directory to store config, channels and cache files.")
     parser.add_argument("--interval-hours", type=float, default=0.0, help="Interval in hours to repeat run mode. Default off.")
     parser.add_argument("--suppress-skip-msgs", action="store_true", help="Suppress not matched/already-seen video messages.")
@@ -558,19 +620,24 @@ if __name__ == "__main__":
 
     channels_file = os.path.join(data_dir, "channels.json")
     cache_file = os.path.join(data_dir, "seen_videos.json")
+    regex_file = os.path.join(data_dir, "regex_presets.json")
 
     if args.mode == "config":
         edit_config(config_file)
         sys.exit(0)
 
     config = load_config(config_file)
-
+    
     if args.mode == "add":
         interactive_add_channel(channels_file)
         sys.exit(0)
 
     if args.mode == "edit":
         interactive_edit_channel(channels_file)
+        sys.exit(0)
+
+    if args.mode == "regex":
+        interactive_edit_regex_presets(regex_file)
         sys.exit(0)
 
     dry_run = args.mode == "dry-run"
