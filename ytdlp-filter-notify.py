@@ -263,15 +263,19 @@ def explain_skip_reason(info, criteria):
     return "\n".join(reasons) if reasons else "Matched"
 
 def interactive_add_channel(channels_file):
-
-    url = input("Enter the channel URL: ").strip()
-
     criteria = {}
     playlist_end = 25
     url_regex = None
 
-    videos, discarded = preview_recent_videos(url, criteria, playlist_end, url_regex)
+    while True:
+        url = input("Enter the channel URL: ").strip()
+        videos, discarded = preview_recent_videos(url, criteria, playlist_end, url_regex)
 
+        if videos:
+            break
+        else:
+            if input("Error downloading videos. Enter a different URL? (y/n): ").strip().lower() != 'y':
+                sys.exit(0)
 
     try:
         playlist_end = int(input("How many videos to pull during scan (max)? (e.g., 25): ").strip())
