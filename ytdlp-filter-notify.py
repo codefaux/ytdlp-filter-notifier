@@ -347,7 +347,7 @@ def interactive_add_channel(channels_file):
 
                 print("Let's re-enter the regex.\n")
 
-        videos, discarded = preview_recent_videos(url, criteria, playlist_end, url_regex, skip_result=True)
+        videos, discarded = preview_recent_videos(url, criteria, playlist_end, url_regex, skip_result=False)
 
         confirm = input("Are you happy with these filters? (y to accept, n to edit again, q to cancel): ").strip().lower()
         if confirm == 'y':
