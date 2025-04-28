@@ -15,6 +15,7 @@ import re
 # === CONFIGURATION ===
 HAMMER_DELAY_RANGE = (2, 4)  # Seconds between requests
 cache_file = ""
+regex_file = ""
 
 # ANSI color codes
 ANSI_BLUE = '\033[94m'
@@ -337,6 +338,49 @@ def interactive_edit_regex_presets(presets_file):
         else:
             print(f"{ANSI_RED}Unknown action.{ANSI_RESET}")
 
+def choose_url_regex(presets_file):
+    presets = load_regex_presets(presets_file)
+
+    while True:
+        print("\nChoose URL regex option:")
+        print("[1] Pick from presets")
+        print("[2] Enter manually")
+        print("[3] Edit presets")
+        print("[4] Cancel / None")
+
+        choice = input("Select option (1-4): ").strip()
+
+        if choice == '1':
+            if not presets:
+                print(f"{ANSI_RED}No presets available.{ANSI_RESET}")
+                continue
+            print("\nAvailable Presets:")
+            for idx, (name, (pattern, replacement)) in enumerate(presets.items()):
+                print(f"[{idx}] {name} =>\n\tpattern: {pattern},\n\treplacement: {replacement}")
+            try:
+                idx = int(input("Select preset number: ").strip())
+                name = list(presets.keys())[idx]
+                pattern, replacement = presets[name]
+                return [pattern, replacement]
+            except (ValueError, IndexError):
+                print(f"{ANSI_RED}Invalid selection.{ANSI_RESET}")
+                continue
+
+        elif choice == '2':
+            pattern = input("Enter regex pattern to match in URL: ").strip()
+            replacement = input("Enter replacement string: ").strip()
+            return [pattern, replacement]
+
+        elif choice == '3':
+            interactive_edit_regex_presets(presets_file)
+            presets = load_regex_presets(presets_file)  # Reload after editing
+
+        elif choice == '4':
+            return None
+
+        else:
+            print(f"{ANSI_RED}Unknown option.{ANSI_RESET}")
+
 def interactive_add_channel(channels_file):
     criteria = {}
     playlist_end = 25
@@ -383,31 +427,7 @@ def interactive_add_channel(channels_file):
             criteria['max_length_seconds'] = max_length
 
         if input("Do you want to set a URL regex replacement? (y/n): ").strip().lower() == 'y':
-            while True:
-                pattern = input("Enter regex pattern to match in URL: ").strip()
-                replacement = input("Enter replacement string: ").strip()
-                url_regex = [pattern, replacement]
-
-                if videos:
-                    print("\nSample URL previews with your regex:")
-                    regex_error = False
-                    for sample_video in videos:
-                        original_url = sample_video.get('url', '')
-                        modified_url = None
-                        try:
-                            modified_url = re.sub(pattern, replacement, original_url)
-                        except Exception as e:
-                            regex_error = True
-                            print(f"{ANSI_RED}Regex error:{ANSI_RESET} {e}")
-                        print(f"Original: {original_url}")
-                        print(f"Modified: {modified_url}\n")
-
-                if not regex_error:
-                    confirm = input("Are you happy with this regex? (y to accept, n to re-enter): ").strip().lower()
-                    if confirm == 'y':
-                        break
-
-                print("Let's re-enter the regex.\n")
+            url_regex = choose_url_regex(regex_file)
 
         videos, discarded = preview_recent_videos(url, criteria, playlist_end, url_regex, skip_result=False)
 
@@ -453,7 +473,7 @@ def interactive_edit_channel(channels_file):
 
     videos, discarded = preview_recent_videos(url, criteria, playlist_end, current_regex)
 
-    confirm = input("Do you wish to edit these filters? (y to accept, anything else to cancel): ").strip().lower()
+    confirm = input("Do you wish to edit these filters? (y to edit, anything else to cancel): ").strip().lower()
     if confirm != 'y':
         return
 
@@ -506,9 +526,7 @@ def interactive_edit_channel(channels_file):
 
         if action == 's':
             while True:
-                pattern = input("Enter new regex pattern: ").strip()
-                replacement = input("Enter new replacement string: ").strip()
-                new_url_regex = [pattern, replacement]
+                pattern, replacement = choose_url_regex(regex_file)
 
                 if videos:
                     print("\nSample URL previews with your regex:")
@@ -524,7 +542,7 @@ def interactive_edit_channel(channels_file):
 
                 confirm = input("Are you happy with this regex? (y to accept, n to re-enter): ").strip().lower()
                 if confirm == 'y':
-                    channel['url_regex'] = new_url_regex
+                    channel['url_regex'] = [pattern, replacement]
                     break
                 else:
                     print("Let's re-enter the regex.\n")
