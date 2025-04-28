@@ -6,6 +6,7 @@ import requests
 import os
 import sys
 import time
+import signal
 import random
 import argparse
 from datetime import datetime
@@ -26,6 +27,14 @@ ANSI_RED = '\033[91m'
 ANSI_RESET = '\033[0m'
 
 # === FUNCTIONS ===
+
+def handle_signal(signum, frame):
+    print(f"Received signal {signum}, exiting.")
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, handle_signal)
+signal.signal(signal.SIGTERM, handle_signal)
+
 def ensure_dir(directory):
     if not os.path.exists(directory):
         os.makedirs(directory)
@@ -664,6 +673,12 @@ def run_channel(channel, dry_run=False, suppress_skip_msgs=False, seen_during_dr
     save_cache(cache_file, seen_videos)
     return
 
+def chunked_sleep(total_seconds, check_interval=3):
+    slept = 0
+    while slept < total_seconds:
+        time.sleep(min(check_interval, total_seconds - slept))
+        slept += check_interval
+
 # === MAIN ===
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="yt-dlp channel monitor and Telegram notifier.")
@@ -715,4 +730,4 @@ if __name__ == "__main__":
             if args.interval_hours <= 0:
                 break
             print(f"{ANSI_BLUE}Sleeping for {args.interval_hours} hours before next scan...{ANSI_RESET}")
-            time.sleep(args.interval_hours * 3600)
+            chunked_sleep(args.interval_hours * 3600)
