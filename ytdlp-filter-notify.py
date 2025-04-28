@@ -263,15 +263,22 @@ def explain_skip_reason(info, criteria):
     return "\n".join(reasons) if reasons else "Matched"
 
 def interactive_add_channel(channels_file):
+    # TODO: Handle URL error, handle regex error, mod preview_recent_videos for non-match use (include orig. URL)
+
     url = input("Enter the channel URL: ").strip()
+
+    criteria = {}
+    playlist_end = 25
+    url_regex = None
+
+    videos, discarded = preview_recent_videos(url, criteria, playlist_end, url_regex)
+
 
     try:
         playlist_end = int(input("How many videos to pull during scan (max)? (e.g., 25): ").strip())
     except ValueError:
-        playlist_end = 25
         print("Invalid input, defaulting to 25.")
 
-    criteria = {}
     while True:
         if input("Filter by title includes? (y/n): ").strip().lower() == 'y':
             includes = input("Enter title keywords (comma separated): ").strip()
@@ -297,7 +304,6 @@ def interactive_add_channel(channels_file):
             max_length = int(input("Enter maximum length in seconds: ").strip())
             criteria['max_length_seconds'] = max_length
 
-        url_regex = None
         if input("Do you want to set a URL regex replacement? (y/n): ").strip().lower() == 'y':
             while True:
                 pattern = input("Enter regex pattern to match in URL: ").strip()
