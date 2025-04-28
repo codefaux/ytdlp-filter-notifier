@@ -16,6 +16,7 @@ import re
 HAMMER_DELAY_RANGE = (2, 4)  # Seconds between requests
 cache_file = ""
 regex_file = ""
+channels_file = ""
 
 # ANSI color codes
 ANSI_BLUE = '\033[94m'
@@ -338,17 +339,19 @@ def interactive_edit_regex_presets(presets_file):
         else:
             print(f"{ANSI_RED}Unknown action.{ANSI_RESET}")
 
-def choose_url_regex(presets_file):
-    presets = load_regex_presets(presets_file)
+def choose_url_regex():
+    presets = load_regex_presets(regex_file)
+    channels = load_channels(channels_file, skip_add=True)
 
     while True:
         print("\nChoose URL regex option:")
         print("[1] Pick from presets")
         print("[2] Enter manually")
         print("[3] Edit presets")
-        print("[4] Cancel / None")
+        print("[4] Import from existing channel")
+        print("[5] Cancel / None")
 
-        choice = input("Select option (1-4): ").strip()
+        choice = input("Select option (1-5): ").strip()
 
         if choice == '1':
             if not presets:
@@ -356,7 +359,7 @@ def choose_url_regex(presets_file):
                 continue
             print("\nAvailable Presets:")
             for idx, (name, (pattern, replacement)) in enumerate(presets.items()):
-                print(f"[{idx}] {name} =>\n\tpattern: {pattern},\n\treplacement: {replacement}")
+                print(f"[{idx}] {name} => pattern: {pattern}, replacement: {replacement}")
             try:
                 idx = int(input("Select preset number: ").strip())
                 name = list(presets.keys())[idx]
@@ -372,10 +375,30 @@ def choose_url_regex(presets_file):
             return [pattern, replacement]
 
         elif choice == '3':
-            interactive_edit_regex_presets(presets_file)
-            presets = load_regex_presets(presets_file)  # Reload after editing
+            interactive_edit_regex_presets(regex_file)
+            presets = load_regex_presets(regex_file)  # Reload after editing
 
         elif choice == '4':
+            if not channels:
+                print(f"{ANSI_RED}No saved channels found.{ANSI_RESET}")
+                continue
+
+            print("\nSaved Channels:")
+            for idx, chan in enumerate(channels):
+                print(f"[{idx}] {chan.get('url', 'UNKNOWN')}")
+
+            try:
+                idx = int(input("Select channel number to import from: ").strip())
+                selected = channels[idx]
+                if selected.get('url_regex'):
+                    print(f"{ANSI_GREEN}Imported regex from channel:{ANSI_RESET} {selected.get('url')}")
+                    return selected['url_regex']
+                else:
+                    print(f"{ANSI_RED}Selected channel has no URL regex configured.{ANSI_RESET}")
+            except (ValueError, IndexError):
+                print(f"{ANSI_RED}Invalid selection.{ANSI_RESET}")
+
+        elif choice == '5':
             return None
 
         else:
@@ -427,7 +450,7 @@ def interactive_add_channel(channels_file):
             criteria['max_length_seconds'] = max_length
 
         if input("Do you want to set a URL regex replacement? (y/n): ").strip().lower() == 'y':
-            url_regex = choose_url_regex(regex_file)
+            url_regex = choose_url_regex()
 
         videos, discarded = preview_recent_videos(url, criteria, playlist_end, url_regex, skip_result=False)
 
@@ -526,7 +549,7 @@ def interactive_edit_channel(channels_file):
 
         if action == 's':
             while True:
-                pattern, replacement = choose_url_regex(regex_file)
+                pattern, replacement = choose_url_regex()
 
                 if videos:
                     print("\nSample URL previews with your regex:")
