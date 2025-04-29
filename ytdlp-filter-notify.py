@@ -391,7 +391,7 @@ def choose_url_regex():
                 continue
             print("\nAvailable Presets:")
             for idx, (name, (pattern, replacement)) in enumerate(presets.items()):
-                print(f"[{idx}] {name} => pattern: {pattern}, replacement: {replacement}")
+                print(f"[{idx}] {name} =>\n\tpattern: {pattern},\n\treplacement: {replacement}")
             try:
                 idx = int(input("Select preset number: ").strip())
                 name = list(presets.keys())[idx]
