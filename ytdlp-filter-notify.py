@@ -9,6 +9,7 @@ import time
 import signal
 import random
 import argparse
+from collections import defaultdict
 from datetime import datetime
 import prettytable
 import re
@@ -24,7 +25,11 @@ ANSI_BLUE = '\033[94m'
 ANSI_YELLOW = '\033[93m'
 ANSI_GREEN = '\033[92m'
 ANSI_RED = '\033[91m'
+ANSI_GREY = '\033[90m'
 ANSI_RESET = '\033[0m'
+
+# === GLOBALS ===
+message_queue = []
 
 # === FUNCTIONS ===
 
@@ -167,6 +172,19 @@ def matches_filters(info, criteria):
         return False
 
     return True
+
+def process_message_queue():
+    # Group messages by datecode
+    grouped_messages = defaultdict(list)
+    for datecode, text, dry_run in message_queue:
+        grouped_messages[datecode].append((text, dry_run))
+    
+    # Process messages sorted by datecode
+    for datecode in sorted(grouped_messages):
+        for text, dry_run in grouped_messages[datecode]:
+            send_telegram_message(text, dry_run=dry_run)
+    
+    message_queue.clear()
 
 def send_telegram_message(text, dry_run=False):
     config = load_config(config_file)
@@ -529,6 +547,7 @@ def interactive_add_channel(channels_file):
             print("Channel added.")
             if input("Would you like to run notifications for this channel? (y/n): ").strip().lower() == 'y':
                 run_channel(channel, dry_run=False, suppress_skip_msgs=False, seen_during_dry_run=False)
+                process_message_queue()
             return
         elif confirm == 'q':
             print("Canceled.")
@@ -649,6 +668,7 @@ def interactive_edit_channel(channels_file):
             print("Channel updated.")
             if input("Would you like to run notifications for this channel? (y/n): ").strip().lower() == 'y':
                 run_channel(channel, dry_run=False, suppress_skip_msgs=False, seen_during_dry_run=False)
+                process_message_queue()
             break
         elif confirm == 'n':
             print("Canceled changes.")
@@ -683,7 +703,7 @@ def run_channel(channel, dry_run=False, suppress_skip_msgs=False, seen_during_dr
         video_id = video['id']
         if video_id in channel_cache:
             if not suppress_skip_msgs:
-                print(f"\033[90mAlready seen:{ANSI_RESET} {video_id} -- {video['title']}")
+                print(f"{ANSI_GREY}Already seen:{ANSI_RESET} {video_id} -- {video['title']}")
             continue
         if matches_filters(video, criteria):
             video_url = video['url']
@@ -699,7 +719,8 @@ def run_channel(channel, dry_run=False, suppress_skip_msgs=False, seen_during_dr
                 upload_date = get_video_upload_date(video_url) or "unknown"
 
             message = f"{cname} :: {upload_date} :: {video['title']}\n\n{video_url}"
-            send_telegram_message(message, dry_run=dry_run)
+            message_queue.append((upload_date, message, dry_run))
+            print(f"{ANSI_BLUE}Queued for:{ANSI_RESET} {video_id}")
             if seen_during_dry_run or not dry_run:
                 channel_cache.add(video_id)
         else:
@@ -764,6 +785,7 @@ if __name__ == "__main__":
     if args.mode in ("run", "dry-run"):
         while True:
             run_all_channels(channels_file, dry_run=dry_run, suppress_skip_msgs=args.suppress_skip_msgs, seen_during_dry_run=args.seen_during_dry_run)
+            process_message_queue()
             if args.interval_hours <= 0:
                 break
             print(f"{ANSI_BLUE}Sleeping for {args.interval_hours} hours before next scan...{ANSI_RESET}")
