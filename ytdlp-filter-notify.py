@@ -141,7 +141,7 @@ def send_telegram_message(text, dry_run=False):
     chat_id = config['telegram_chat_id']
 
     if dry_run:
-        print(f"{ANSI_BLUE}[Dry-Run] Notification: {ANSI_RESET} {text}")
+        print(f"\n\t{ANSI_BLUE}[Dry-Run] Notification: {ANSI_RESET}\n{text}\n\t{ANSI_BLUE}[End]{ANSI_RESET}\n")
         return
     else:
         print(f"{ANSI_GREEN}Sending Notifiation: {ANSI_RESET} {text}")
