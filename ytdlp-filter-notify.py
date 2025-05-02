@@ -196,6 +196,7 @@ def process_message_queue():
     # Process messages sorted by datecode
     for datecode in sorted(grouped_messages):
         for text, dry_run in grouped_messages[datecode]:
+            send_webhook_message(text, dry_run=dry_run)
             send_telegram_message(text, dry_run=dry_run)
     
     message_queue.clear()
