@@ -104,6 +104,39 @@ def get_latest_videos(channel_url, playlist_end=None):
         print(f"{ANSI_RED}Failed to parse yt-dlp output.{ANSI_RESET}")
         return [], None
 
+def get_video_upload_date(video_url):
+    """Return upload_date in yyyymmdd format from a video URL using yt-dlp."""
+    cmd = [
+        "yt-dlp",
+        "--no-warnings",
+        "--no-check-certificate",
+        "--print", "%(timestamp)s,%(upload_date)s",
+        video_url
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"{ANSI_RED}yt-dlp error while fetching metadata:{ANSI_RESET}", result.stderr.strip())
+        return None
+
+    output = result.stdout.strip()
+    if ',' not in output:
+        print(f"{ANSI_RED}Unexpected output format from yt-dlp:{ANSI_RESET} {output}")
+        return None
+
+    timestamp_str, upload_date_str = output.split(',', 1)
+
+    if upload_date_str and re.fullmatch(r"\d{8}", upload_date_str):
+        return upload_date_str
+
+    try:
+        timestamp = int(timestamp_str)
+        dt = datetime.utcfromtimestamp(timestamp)
+        return dt.strftime("%Y%m%d")
+    except ValueError:
+        print(f"{ANSI_RED}Invalid timestamp:{ANSI_RESET} {timestamp_str}")
+        return None
+
 def matches_filters(info, criteria):
     title = info.get('title', '').lower()
     description = info.get('description', '').lower()
@@ -661,7 +694,11 @@ def run_channel(channel, dry_run=False, suppress_skip_msgs=False, seen_during_dr
                 except Exception as e:
                     print(f"{ANSI_RED}Failed applying URL regex:{ANSI_RESET} {e}")
 
-            message = f"{cname} :: {video['title']}\n\n{video_url}"
+            upload_date = video.get('upload_date')
+            if not upload_date:
+                upload_date = get_video_upload_date(video_url) or "unknown"
+
+            message = f"{cname} :: {upload_date} :: {video['title']}\n\n{video_url}"
             send_telegram_message(message, dry_run=dry_run)
             if seen_during_dry_run or not dry_run:
                 channel_cache.add(video_id)
