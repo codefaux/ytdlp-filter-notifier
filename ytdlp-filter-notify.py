@@ -19,6 +19,8 @@ HAMMER_DELAY_RANGE = (2, 4)  # Seconds between requests
 cache_file = ""
 regex_file = ""
 channels_file = ""
+netrc_file = ""
+using_netrc = False
 
 # ANSI color codes
 ANSI_BLUE = '\033[94m'
@@ -93,10 +95,13 @@ def get_latest_videos(channel_url, playlist_end=None):
         "--dump-single-json",
         "--no-warnings",
         "--no-check-certificate",
+        channel_url
     ]
+
     if playlist_end:
-        cmd.extend(["--playlist-end", str(playlist_end)])
-    cmd.append(channel_url)
+        cmd[5:5] = ["--playlist-end", str(playlist_end)]
+    if using_netrc:
+        cmd[1:1] = ["--netrc", "--netrc-location", netrc_file]
 
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
@@ -107,6 +112,8 @@ def get_latest_videos(channel_url, playlist_end=None):
         return data.get('entries', [])[::-1], data.get('channel') or data.get('title') or data.get('uploader')
     except json.JSONDecodeError:
         print(f"{ANSI_RED}Failed to parse yt-dlp output.{ANSI_RESET}")
+        if not using_netrc:
+            print(f"{ANSI_YELLOW}Tip: Create a netrc file at {netrc_file} if the video requires login.{ANSI_RESET}")
         return [], None
 
 def get_video_upload_date(video_url):
@@ -119,9 +126,14 @@ def get_video_upload_date(video_url):
         video_url
     ]
 
+    if using_netrc:
+        cmd[1:1] = ["--netrc", "--netrc-location", netrc_file]
+
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        print(f"{ANSI_RED}yt-dlp error while fetching metadata:{ANSI_RESET}", result.stderr.strip())
+        print(f"{ANSI_RED}yt-dlp error while fetching metadata:{ANSI_RESET} {result.stderr.strip()}")
+        if not using_netrc:
+            print(f"{ANSI_YELLOW}Tip: Create a netrc file at {netrc_file} if the video requires login.{ANSI_RESET}")
         return None
 
     output = result.stdout.strip()
@@ -761,13 +773,17 @@ if __name__ == "__main__":
     channels_file = os.path.join(data_dir, "channels.json")
     cache_file = os.path.join(data_dir, "seen_videos.json")
     regex_file = os.path.join(data_dir, "regex_presets.json")
+    netrc_file = os.path.join(data_dir, "netrc")
 
     if args.mode == "config":
         edit_config(config_file)
         sys.exit(0)
 
     config = load_config(config_file)
-    
+    using_netrc = os.path.exists(netrc_file)
+    if not using_netrc:
+        print(f"{ANSI_YELLOW}Tip: Create a netrc file at {netrc_file} if a platform (eg. nebula) requires login.{ANSI_RESET}")
+
     if args.mode == "add":
         interactive_add_channel(channels_file)
         sys.exit(0)
