@@ -21,6 +21,8 @@ regex_file = ""
 channels_file = ""
 netrc_file = ""
 using_netrc = False
+telegram_dispatch = True
+webhook_dispatch = True
 
 # ANSI color codes
 ANSI_BLUE = '\033[94m'
@@ -58,16 +60,16 @@ def save_json(file_path, data):
 
 def load_config(config_file):
     config = load_json(config_file, {})
-    if not config:
-        config['telegram_bot_token'] = input("Enter your Telegram bot token: ").strip()
-        config['telegram_chat_id'] = input("Enter your Telegram chat ID (@username or ID): ").strip()
-        save_json(config_file, config)
+    while not config:
+        edit_config(config_file)
     return config
 
 def edit_config(config_file):
     config = {}
     config['telegram_bot_token'] = input("Enter your new Telegram bot token: ").strip()
     config['telegram_chat_id'] = input("Enter your new Telegram chat ID (@username or ID): ").strip()
+    config['webhook_url'] = input("Enter your new webhook URL: ").strip()
+
     save_json(config_file, config)
     print("Configuration updated.")
 
@@ -199,6 +201,9 @@ def process_message_queue():
     message_queue.clear()
 
 def send_telegram_message(text, dry_run=False):
+    if not telegram_dispatch:
+        return
+
     config = load_config(config_file)
     bot_token = config['telegram_bot_token']
     chat_id = config['telegram_chat_id']
@@ -237,6 +242,55 @@ def send_telegram_message(text, dry_run=False):
                 sys.exit(1)
         else:
             print(f"{ANSI_RED}Failed to send Telegram message (HTTP {response.status_code}):{ANSI_RESET} {response.text}")
+            sys.exit(1)
+
+    if retries > max_retries:
+        print(f"{ANSI_RED}Exceeded maximum retries. Exiting.{ANSI_RESET}")
+        sys.exit(1)
+
+    time.sleep(1)
+
+def send_webhook_message(text, dry_run=False):
+    if not webhook_dispatch:
+        return
+
+    config = load_config(config_file)
+
+    webhook_url = config['webhook_url']
+
+    if dry_run:
+        print(f"\n\t{ANSI_BLUE}[Dry-Run] Webhook Notification: {ANSI_RESET}\n{text}\n\t{ANSI_BLUE}[End]{ANSI_RESET}\n")
+        return
+    else:
+        print(f"{ANSI_GREEN}Sending Webhook Notification: {ANSI_RESET} {text}")
+
+    payload = {
+        "message": text
+    }
+
+    retries = 0
+    max_retries = 3
+
+    while retries <= max_retries:
+        try:
+            response = requests.post(webhook_url, json=payload)
+        except requests.RequestException as e:
+            print(f"{ANSI_RED}Request error while sending webhook message: {e}{ANSI_RESET}")
+            sys.exit(1)
+
+        if response.status_code == 200 or response.status_code == 204:
+            break
+        elif response.status_code == 429:
+            try:
+                retry_after = int(response.headers.get("Retry-After", 5))
+                print(f"{ANSI_YELLOW}Rate limited by webhook. Retrying after {retry_after} seconds...{ANSI_RESET}")
+                time.sleep(retry_after + 1)
+                retries += 1
+            except (ValueError, KeyError):
+                print(f"{ANSI_RED}Rate limit encountered, but failed to parse Retry-After. Exiting.{ANSI_RESET}")
+                sys.exit(1)
+        else:
+            print(f"{ANSI_RED}Failed to send webhook message (HTTP {response.status_code}):{ANSI_RESET} {response.text}")
             sys.exit(1)
 
     if retries > max_retries:
@@ -757,6 +811,8 @@ if __name__ == "__main__":
     parser.add_argument("--interval-hours", type=float, default=0.0, help="Interval in hours to repeat run mode. Default off.")
     parser.add_argument("--suppress-skip-msgs", action="store_true", help="Suppress not matched/already-seen video messages.")
     parser.add_argument("--seen-during-dry-run", action="store_true", help="Mark videos as seen during dry-run.")
+    parser.add_argument("--disable-telegram-dispatch", action="store_true", help="Disable Telegram message dispatch.")
+    parser.add_argument("--disable-webhook-dispatch", action="store_true", help="Disable Webhook message dispatch.")
     args = parser.parse_args()
 
     data_dir = args.data_dir
@@ -774,6 +830,8 @@ if __name__ == "__main__":
     cache_file = os.path.join(data_dir, "seen_videos.json")
     regex_file = os.path.join(data_dir, "regex_presets.json")
     netrc_file = os.path.join(data_dir, "netrc")
+    telegram_dispatch = not args.disable_telegram_dispatch
+    webhook_dispatch = not args.disable_webhook_dispatch
 
     if args.mode == "config":
         edit_config(config_file)
