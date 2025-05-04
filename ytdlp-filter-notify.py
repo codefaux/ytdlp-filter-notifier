@@ -65,10 +65,35 @@ def load_config(config_file):
     return config
 
 def edit_config(config_file):
-    config = {}
-    config['telegram_bot_token'] = input("Enter your new Telegram bot token: ").strip()
-    config['telegram_chat_id'] = input("Enter your new Telegram chat ID (@username or ID): ").strip()
-    config['webhook_url'] = input("Enter your new webhook URL: ").strip()
+    config = load_json(config_file, {})
+    
+    b_token = config.get('telegram_bot_token', None)
+    if b_token:
+        print(f"Existing bot token: {b_token}")
+    res = input("Enter your new Telegram bot token: ").strip()
+    if res:
+        config['telegram_bot_token'] = res
+    else:
+        print("Skip empty input")
+
+
+    b_id = config.get('telegram_chat_id', None)
+    if b_id:
+        print(f"Existing chat ID: {b_id}")
+    res = input("Enter your new Telegram chat ID (@username or ID): ").strip()
+    if res:
+        config['telegram_chat_id'] = res
+    else:
+        print("Skip empty input")
+
+    w_url = config.get('webhook_url', None)
+    if w_url:
+        print(f"Existing webhook URL: {w_url}")
+    res = input("Enter your new webhook URL: ").strip()
+    if res:
+        config['webhook_url'] = res
+    else:
+        print("Skip empty input")
 
     save_json(config_file, config)
     print("Configuration updated.")
@@ -807,7 +832,7 @@ def chunked_sleep(total_seconds, check_interval=3):
 # === MAIN ===
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="yt-dlp channel monitor and Telegram notifier.")
-    parser.add_argument("mode", nargs="?", choices=["run", "add", "edit", "regex", "dry-run", "config"], default="dry-run", help="Operation mode.")
+    parser.add_argument("mode", nargs="?", choices=["run", "add", "edit", "regex", "dry-run", "config"], default="run", help="Operation mode.")
     parser.add_argument("--data-dir", type=str, default=".", help="Directory to store config, channels and cache files.")
     parser.add_argument("--interval-hours", type=float, default=0.0, help="Interval in hours to repeat run mode. Default off.")
     parser.add_argument("--suppress-skip-msgs", action="store_true", help="Suppress not matched/already-seen video messages.")
