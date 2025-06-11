@@ -192,14 +192,15 @@ def get_video_upload_date(video_url):
 
     timestamp_str, upload_date_str = output.split(",", 1)
 
-    if upload_date_str and re.fullmatch(r"\d{8}", upload_date_str):
-        return upload_date_str
-
     try:
         timestamp = int(timestamp_str)
-        dt = datetime.utcfromtimestamp(timestamp)
-        return dt.strftime("%Y%m%d")
+        dt = datetime.fromtimestamp(timestamp)
+        dt_str = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        return dt_str
     except ValueError:
+        if upload_date_str and re.fullmatch(r"\d{8}", upload_date_str):
+            return upload_date_str
+
         print(f"{ANSI_RED}Invalid timestamp:{ANSI_RESET} {timestamp_str}")
         return None
 
@@ -979,9 +980,9 @@ def run_channel(
                 except Exception as e:
                     print(f"{ANSI_RED}Failed applying URL regex:{ANSI_RESET} {e}")
 
-            upload_date = video.get("upload_date")
-            if not upload_date:
-                upload_date = get_video_upload_date(video_url) or "unknown"
+            upload_date = get_video_upload_date(video_url) or video.get(
+                "upload_date", ""
+            )
 
             message = f"{cname} :: {upload_date} :: {video['title']}\n\n{video_url}"
             message_queue.append((upload_date, message, dry_run))
