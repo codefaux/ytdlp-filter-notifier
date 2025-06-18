@@ -289,7 +289,7 @@ def send_telegram_message(text, dry_run=False):
                 print(
                     f"{ANSI_YELLOW}Rate limited by Telegram. Retrying after {retry_after} seconds...{ANSI_RESET}"
                 )
-                time.sleep(retry_after + 3)
+                time.sleep(retry_after + 2)
                 retries += 1
             except (ValueError, KeyError, json.JSONDecodeError):
                 print(
@@ -986,13 +986,13 @@ def run_channel(
 
             message = f"{cname} :: {upload_date} :: {video['title']}\n\n{video_url}"
             message_queue.append((upload_date, message, dry_run))
-            print(f"{ANSI_BLUE}Queued for:{ANSI_RESET} {video_id}")
+            print(f"{ANSI_BLUE}Queued for:{ANSI_RESET}  {video_id} -- {video['title']}")
             if seen_during_dry_run or not dry_run:
                 channel_cache.add(video_id)
         else:
             if not suppress_skip_msgs:
                 print(
-                    f"{ANSI_YELLOW}Not matched:{ANSI_RESET} {video_id} -- {video['title']}"
+                    f"{ANSI_YELLOW}Not matched:{ANSI_RESET} {video_id} -- {ANSI_GREY}{video['title']}{ANSI_RESET}"
                 )
 
     seen_videos[url] = list(channel_cache)
